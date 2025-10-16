@@ -67,7 +67,7 @@ var velocityLayer = L.velocityLayer({
   overlaySmoothing: 'high', // smoothing quality: 'low', 'medium', 'high', 'ultra'
   
   // CUSTOM COLOR MAPPING (NEW)
-  customColorMap: null, // array of {knots: number, color: string} objects for custom colors
+  customColorMap: null, // array of color strings for custom color mapping (same format as colorScale)
 
   // optional pane to add the layer, will be created if doesn't exist
   // leaflet v1+ only (falls back to overlayPane for < v1)
@@ -104,38 +104,44 @@ The color overlay uses the same color scale as the particle animation, mapping v
 
 ## Custom Color Mapping
 
-The `customColorMap` option allows you to define exact colors for specific wind speeds in knots, giving you complete control over the visualization appearance. This is perfect for creating weather visualizations that match specific meteorological standards or brand requirements.
+The `customColorMap` option allows you to define custom colors as a simple array, giving you complete control over the visualization appearance. This works exactly like the `colorScale` option but takes precedence when specified.
 
 ```javascript
-// Define your custom knot-based color mapping
+// Define your custom color mapping as a simple array
 const customColors = [
-  { knots: 0,  color: "#9700ff" },  // Purple for calm
-  { knots: 10, color: "#0096ff" },  // Blue for light wind
-  { knots: 20, color: "#00e600" },  // Green for moderate wind
-  { knots: 30, color: "#ffc800" },  // Orange for strong wind
-  { knots: 40, color: "#dc4a1d" },  // Red for very strong wind
-  { knots: 50, color: "#fe0096" }   // Pink for extreme wind
+  "#9700ff",  // Purple for low velocity  
+  "#0032ff",  // Blue for light velocity
+  "#00c7ff",  // Cyan for moderate velocity
+  "#11d411",  // Green for fresh velocity
+  "#fffe00",  // Yellow for strong velocity
+  "#ff9600",  // Orange for very strong velocity
+  "#dc4a1d",  // Red for extreme velocity
+  "#fe0096"   // Pink for hurricane-force velocity
 ];
 
 var velocityLayer = L.velocityLayer({
   showColorOverlay: true,
   customColorMap: customColors,    // Your custom color mapping
   particleColor: 'velocity',       // Color particles using your scheme
+  minVelocity: 0,                  // Min velocity in m/s
+  maxVelocity: 25,                 // Max velocity in m/s (≈50 knots)
   data: windData
 });
 ```
 
 **Key Features:**
-- Define colors for specific wind speeds in knots
-- Automatic conversion from knots to m/s internally
-- Smooth color interpolation between defined points
+- Simple array of color strings (hex or rgb format)
+- Colors are mapped evenly across your velocity range (minVelocity to maxVelocity)
+- Automatic color interpolation between defined points
 - Applies to both overlay gradient and particle colors
 - Dynamic color scheme switching at runtime
 
 **Color Format Support:**
 - Hex colors: `"#ff0000"`
 - RGB strings: `"rgb(255, 0, 0)"`
-- Automatic sorting by knot values
+
+**Velocity Range Control:**
+You control the wind speed range using `minVelocity` and `maxVelocity` options (in m/s). Colors are distributed evenly across this range.
 
 For detailed examples and advanced usage, see [CUSTOM_COLOR_MAPPING.md](CUSTOM_COLOR_MAPPING.md).
 

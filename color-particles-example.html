@@ -247,15 +247,15 @@
     <div class="container">
         <div class="info-box">
             <h3>🎯 What You're Seeing</h3>
-            <p>This example demonstrates the <span class="highlight">Custom Color Particles</span> feature that combines:</p>
+            <p>This example demonstrates the <span class="highlight">Custom Color Mapping</span> feature that combines:</p>
             <br>
-            <div class="feature-badge">Custom Color Mapping</div>
-            <div class="feature-badge">Knot-based Colors</div>
+            <div class="feature-badge">Simple Color Arrays</div>
+            <div class="feature-badge">Custom Color Schemes</div>
             <div class="feature-badge">Colored Particles</div>
             <div class="feature-badge">Smooth Gradients</div>
             <div class="feature-badge">Real-time Animation</div>
             <br><br>
-            <p>You can now specify exact colors for specific wind speeds in knots! The particles and overlay will use your custom color scheme, creating a beautiful dynamic visualization exactly like windy.com!</p>
+            <p>You can now specify custom colors as a simple array! The colors map evenly across your velocity range, creating a beautiful dynamic visualization exactly like windy.com but with your own color scheme!</p>
         </div>
 
         <div class="controls">
@@ -417,17 +417,16 @@ function setOverlayOpacity(value) {
   overlayOpacity: 0.6,          // Transparency (0-1)
   overlaySmoothing: 'high',     // Quality: 'low', 'medium', 'high', 'ultra'
   
-  // 🎯 CUSTOM COLOR MAPPING (NEW FEATURE!)
-  customColorMap: [             // Define colors by wind speed in knots
-    { knots: 0,  color: "#9700ff" },  // Purple for calm
-    { knots: 5,  color: "#0032ff" },  // Blue for light breeze
-    { knots: 10, color: "#00c7ff" },  // Cyan for gentle breeze
-    { knots: 15, color: "#11d411" },  // Green for moderate breeze
-    { knots: 20, color: "#fffe00" },  // Yellow for fresh breeze
-    { knots: 25, color: "#ff9600" },  // Orange for strong breeze
-    { knots: 30, color: "#dc4a1d" },  // Red for near gale
-    { knots: 40, color: "#b40032" },  // Deep red for gale
-    { knots: 50, color: "#fe0096" }   // Pink for storm/hurricane
+  // 🎯 CUSTOM COLOR MAPPING (SIMPLIFIED!)
+  customColorMap: [             // Just an array of colors!
+    "#9700ff",  // Purple for low velocity
+    "#0032ff",  // Blue for light velocity
+    "#00c7ff",  // Cyan for moderate velocity
+    "#11d411",  // Green for fresh velocity
+    "#fffe00",  // Yellow for strong velocity
+    "#ff9600",  // Orange for very strong velocity
+    "#dc4a1d",  // Red for extreme velocity
+    "#fe0096"   // Pink for hurricane-force velocity
   ],
   
   // 🎨 PARTICLE COLORING
@@ -439,67 +438,56 @@ function setOverlayOpacity(value) {
   particleLife: 40,             // Animation smoothness
   frameRate: 15,                // FPS balance
   
-  // 🎨 STYLING
-  velocityScale: 0.005          // Animation speed
+  // 🎨 VELOCITY RANGE
+  minVelocity: 0,              // Min velocity in m/s
+  maxVelocity: 25,             // Max velocity in m/s (≈50 knots)
+  velocityScale: 0.005         // Animation speed
 };</code></pre>
 
             <h4 style="margin: 20px 0 10px 0;">5. Custom Color Mapping Examples</h4>
             <pre><code>// Example 1: Weather-based colors (your original scheme)
 const weatherColors = [
-  { knots: 0,  color: "#9700ff" },  // Calm - Purple
-  { knots: 2,  color: "#6400ff" },
-  { knots: 4,  color: "#3200ff" },
-  { knots: 6,  color: "#0032ff" },  // Light air - Blue
-  { knots: 8,  color: "#0064ff" },
-  { knots: 10, color: "#0096ff" },
-  { knots: 12, color: "#00c7ff" },  // Light breeze - Cyan
-  { knots: 14, color: "#00e6f0" },
-  { knots: 16, color: "#25c192" },
-  { knots: 18, color: "#11d411" },  // Gentle breeze - Green
-  { knots: 20, color: "#00e600" },
-  { knots: 22, color: "#00fa00" },
-  { knots: 24, color: "#b8ff61" },
-  { knots: 26, color: "#fffe00" },  // Moderate breeze - Yellow
-  { knots: 28, color: "#ffe100" },
-  { knots: 30, color: "#ffc800" },
-  { knots: 32, color: "#ffaf00" },  // Fresh breeze - Orange
-  { knots: 34, color: "#ff9600" },
-  { knots: 36, color: "#e67d00" },
-  { knots: 38, color: "#e66400" },
-  { knots: 40, color: "#dc4a1d" },  // Strong breeze - Red
-  { knots: 42, color: "#c8321d" },
-  { knots: 44, color: "#b4191d" },
-  { knots: 46, color: "#aa001d" },
-  { knots: 48, color: "#b40032" },  // Near gale - Deep red
-  { knots: 50, color: "#c80064" },
-  { knots: 51, color: "#fe0096" }   // Gale+ - Pink
+  "#9700ff", "#6400ff", "#3200ff", "#0032ff", "#0064ff", 
+  "#0096ff", "#00c7ff", "#00e6f0", "#25c192", "#11d411", 
+  "#00e600", "#00fa00", "#b8ff61", "#fffe00", "#ffe100", 
+  "#ffc800", "#ffaf00", "#ff9600", "#e67d00", "#e66400", 
+  "#dc4a1d", "#c8321d", "#b4191d", "#aa001d", "#b40032", 
+  "#c80064", "#fe0096"
 ];
 
 // Example 2: Simple rainbow colors
 const rainbowColors = [
-  { knots: 0,  color: "#8b00ff" },  // Violet
-  { knots: 5,  color: "#0000ff" },  // Blue
-  { knots: 10, color: "#00ffff" },  // Cyan
-  { knots: 15, color: "#00ff00" },  // Green
-  { knots: 20, color: "#ffff00" },  // Yellow
-  { knots: 25, color: "#ff8000" },  // Orange
-  { knots: 30, color: "#ff0000" }   // Red
+  "#8b00ff",  // Violet
+  "#0000ff",  // Blue
+  "#00ffff",  // Cyan
+  "#00ff00",  // Green
+  "#ffff00",  // Yellow
+  "#ff8000",  // Orange
+  "#ff0000"   // Red
 ];
 
 // Example 3: Monochrome blue scale
 const blueScale = [
-  { knots: 0,  color: "#f0f8ff" },  // Alice blue
-  { knots: 10, color: "#87ceeb" },  // Sky blue
-  { knots: 20, color: "#4169e1" },  // Royal blue
-  { knots: 30, color: "#0000cd" },  // Medium blue
-  { knots: 40, color: "#00008b" }   // Dark blue
+  "#f0f8ff",  // Alice blue
+  "#87ceeb",  // Sky blue
+  "#4169e1",  // Royal blue
+  "#00008b",  // Navy blue
+  "#191970"   // Midnight blue
+];
+
+// Example 4: Ocean theme
+const oceanTheme = [
+  "#e6f3ff", "#b3d9ff", "#80bfff", "#4da6ff", 
+  "#1a8cff", "#0073e6", "#005cb3", "#004080"
 ];
 
 // Usage in velocity layer
 const velocityLayer = L.velocityLayer({
   showColorOverlay: true,
   customColorMap: weatherColors,  // Use any of the above
-  particleColor: 'velocity'
+  particleColor: 'velocity',
+  minVelocity: 0,                 // Adjust velocity range as needed
+  maxVelocity: 25                 // Higher values for more wind range
 });</code></pre>
         </div>
 
@@ -539,35 +527,14 @@ const velocityLayer = L.velocityLayer({
         fetch('demo/wind-gbr.json')
             .then(response => response.json())
             .then(data => {
-                // Define your custom knot-based color mapping
-                const knotColorData = [
-                    { "knots": 0, "color": "#9700ff" },
-                    { "knots": 2, "color": "#6400ff" },
-                    { "knots": 4, "color": "#3200ff" },
-                    { "knots": 6, "color": "#0032ff" },
-                    { "knots": 8, "color": "#0064ff" },
-                    { "knots": 10, "color": "#0096ff" },
-                    { "knots": 12, "color": "#00c7ff" },
-                    { "knots": 14, "color": "#00e6f0" },
-                    { "knots": 16, "color": "#25c192" },
-                    { "knots": 18, "color": "#11d411" },
-                    { "knots": 20, "color": "#00e600" },
-                    { "knots": 22, "color": "#00fa00" },
-                    { "knots": 24, "color": "#b8ff61" },
-                    { "knots": 26, "color": "#fffe00" },
-                    { "knots": 28, "color": "#ffe100" },
-                    { "knots": 30, "color": "#ffc800" },
-                    { "knots": 32, "color": "#ffaf00" },
-                    { "knots": 34, "color": "#ff9600" },
-                    { "knots": 36, "color": "#e67d00" },
-                    { "knots": 38, "color": "#e66400" },
-                    { "knots": 40, "color": "#dc4a1d" },
-                    { "knots": 42, "color": "#c8321d" },
-                    { "knots": 44, "color": "#b4191d" },
-                    { "knots": 46, "color": "#aa001d" },
-                    { "knots": 48, "color": "#b40032" },
-                    { "knots": 50, "color": "#c80064" },
-                    { "knots": 51, "color": "#fe0096" }
+                // Define your custom color mapping (just the colors, no knots needed)
+                const customColors = [
+                    "#9700ff", "#6400ff", "#3200ff", "#0032ff", "#0064ff", 
+                    "#0096ff", "#00c7ff", "#00e6f0", "#25c192", "#11d411", 
+                    "#00e600", "#00fa00", "#b8ff61", "#fffe00", "#ffe100", 
+                    "#ffc800", "#ffaf00", "#ff9600", "#e67d00", "#e66400", 
+                    "#dc4a1d", "#c8321d", "#b4191d", "#aa001d", "#b40032", 
+                    "#c80064", "#fe0096"
                 ];
 
                 // Create velocity layer with CUSTOM COLOR PARTICLES
@@ -577,8 +544,8 @@ const velocityLayer = L.velocityLayer({
                     overlayOpacity: 0.6,         // Semi-transparent overlay
                     overlaySmoothing: 'high',    // Smooth gradients
                     
-                    // 🎯 YOUR CUSTOM COLOR MAPPING
-                    customColorMap: knotColorData,  // Use your knot-based colors!
+                    // 🎯 YOUR CUSTOM COLOR MAPPING (SIMPLIFIED!)
+                    customColorMap: customColors,    // Just an array of colors!
                     
                     // Particle settings for color particles
                     particleColor: 'velocity',   // Color particles by velocity
@@ -596,6 +563,8 @@ const velocityLayer = L.velocityLayer({
                     
                     // Data configuration
                     data: data,
+                    minVelocity: 0,              // Min velocity in m/s
+                    maxVelocity: 25,             // Max velocity in m/s (≈50 knots)
                     velocityScale: 0.005
                 });
 
@@ -662,38 +631,19 @@ const velocityLayer = L.velocityLayer({
         function useWeatherColors() {
             if (velocityLayer) {
                 const weatherColors = [
-                    { knots: 0,  color: "#9700ff" },
-                    { knots: 2,  color: "#6400ff" },
-                    { knots: 4,  color: "#3200ff" },
-                    { knots: 6,  color: "#0032ff" },
-                    { knots: 8,  color: "#0064ff" },
-                    { knots: 10, color: "#0096ff" },
-                    { knots: 12, color: "#00c7ff" },
-                    { knots: 14, color: "#00e6f0" },
-                    { knots: 16, color: "#25c192" },
-                    { knots: 18, color: "#11d411" },
-                    { knots: 20, color: "#00e600" },
-                    { knots: 22, color: "#00fa00" },
-                    { knots: 24, color: "#b8ff61" },
-                    { knots: 26, color: "#fffe00" },
-                    { knots: 28, color: "#ffe100" },
-                    { knots: 30, color: "#ffc800" },
-                    { knots: 32, color: "#ffaf00" },
-                    { knots: 34, color: "#ff9600" },
-                    { knots: 36, color: "#e67d00" },
-                    { knots: 38, color: "#e66400" },
-                    { knots: 40, color: "#dc4a1d" },
-                    { knots: 42, color: "#c8321d" },
-                    { knots: 44, color: "#b4191d" },
-                    { knots: 46, color: "#aa001d" },
-                    { knots: 48, color: "#b40032" },
-                    { knots: 50, color: "#c80064" },
-                    { knots: 51, color: "#fe0096" }
+                    "#9700ff", "#6400ff", "#3200ff", "#0032ff", "#0064ff", 
+                    "#0096ff", "#00c7ff", "#00e6f0", "#25c192", "#11d411", 
+                    "#00e600", "#00fa00", "#b8ff61", "#fffe00", "#ffe100", 
+                    "#ffc800", "#ffaf00", "#ff9600", "#e67d00", "#e66400", 
+                    "#dc4a1d", "#c8321d", "#b4191d", "#aa001d", "#b40032", 
+                    "#c80064", "#fe0096"
                 ];
                 
                 velocityLayer.setOptions({
                     customColorMap: weatherColors,
-                    showColorOverlay: true
+                    showColorOverlay: true,
+                    minVelocity: 0,
+                    maxVelocity: 25  // ≈50 knots
                 });
                 console.log('🌦️ Weather Colors applied!');
             }
@@ -702,18 +652,15 @@ const velocityLayer = L.velocityLayer({
         function useRainbowColors() {
             if (velocityLayer) {
                 const rainbowColors = [
-                    { knots: 0,  color: "#8b00ff" },  // Violet
-                    { knots: 5,  color: "#0000ff" },  // Blue
-                    { knots: 10, color: "#00ffff" },  // Cyan
-                    { knots: 15, color: "#00ff00" },  // Green
-                    { knots: 20, color: "#ffff00" },  // Yellow
-                    { knots: 25, color: "#ff8000" },  // Orange
-                    { knots: 30, color: "#ff0000" }   // Red
+                    "#8b00ff", "#0000ff", "#00ffff", "#00ff00", 
+                    "#ffff00", "#ff8000", "#ff0000"
                 ];
                 
                 velocityLayer.setOptions({
                     customColorMap: rainbowColors,
-                    showColorOverlay: true
+                    showColorOverlay: true,
+                    minVelocity: 0,
+                    maxVelocity: 15  // ≈30 knots
                 });
                 console.log('🌈 Rainbow Colors applied!');
             }
@@ -722,16 +669,14 @@ const velocityLayer = L.velocityLayer({
         function useBlueColors() {
             if (velocityLayer) {
                 const blueColors = [
-                    { knots: 0,  color: "#f0f8ff" },  // Alice blue
-                    { knots: 10, color: "#87ceeb" },  // Sky blue
-                    { knots: 20, color: "#4169e1" },  // Royal blue
-                    { knots: 30, color: "#00008b" },  // Navy blue
-                    { knots: 40, color: "#191970" }   // Midnight blue
+                    "#f0f8ff", "#87ceeb", "#4169e1", "#00008b", "#191970"
                 ];
                 
                 velocityLayer.setOptions({
                     customColorMap: blueColors,
-                    showColorOverlay: true
+                    showColorOverlay: true,
+                    minVelocity: 0,
+                    maxVelocity: 20  // ≈40 knots
                 });
                 console.log('💙 Blue Scale applied!');
             }
@@ -741,7 +686,9 @@ const velocityLayer = L.velocityLayer({
             if (velocityLayer) {
                 velocityLayer.setOptions({
                     customColorMap: null,  // Clear custom colors
-                    showColorOverlay: true
+                    showColorOverlay: true,
+                    minVelocity: 0,
+                    maxVelocity: 10        // Default range
                 });
                 console.log('🔄 Default Colors restored!');
             }

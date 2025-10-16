@@ -295,7 +295,7 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
     // used to align color scale
     colorScale: null,
     customColorMap: null,
-    // array of {knots: number, color: string} objects for custom color mapping
+    // array of color strings for custom color mapping (same format as colorScale)
     data: null,
     showColorOverlay: false,
     // option to show color overlay
@@ -583,42 +583,6 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
     if (this._context) this._context.clearRect(0, 0, 3000, 3000);
     if (this._overlayContext) this._overlayContext.clearRect(0, 0, 3000, 3000);
   },
-  _parseCustomColorMap: function _parseCustomColorMap(customColorMap) {
-    // Sort by knots value to ensure proper ordering
-    var sortedMap = customColorMap.slice().sort(function (a, b) {
-      return a.knots - b.knots;
-    }); // Convert to RGB color strings
-
-    var colorScale = sortedMap.map(function (item) {
-      var color = item.color; // Handle hex colors
-
-      if (color.startsWith('#')) {
-        var hex = color.slice(1);
-        var r = parseInt(hex.slice(0, 2), 16);
-        var g = parseInt(hex.slice(2, 4), 16);
-        var b = parseInt(hex.slice(4, 6), 16);
-        return 'rgb(' + r + ', ' + g + ', ' + b + ')';
-      } // If already RGB format, return as is
-
-
-      return color;
-    }); // Update velocity ranges based on knot values
-
-    if (sortedMap.length > 0) {
-      this.options.minVelocity = sortedMap[0].knots * 0.514444; // Convert knots to m/s
-
-      this.options.maxVelocity = sortedMap[sortedMap.length - 1].knots * 0.514444;
-    }
-
-    console.log('Custom color map parsed:', {
-      originalKnots: sortedMap.map(function (item) {
-        return item.knots;
-      }),
-      velocityRange: [this.options.minVelocity, this.options.maxVelocity],
-      colorCount: colorScale.length
-    });
-    return colorScale;
-  },
   _drawColorOverlay: function _drawColorOverlay() {
     if (!this._overlayContext || !this._windy || !this._windy.field) {
       console.log('Color overlay not ready:', {
@@ -642,14 +606,13 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
     this._overlayContext.clearRect(0, 0, width, height);
 
     try {
-      // Determine color scale to use
+      // Determine color scale to use - customColorMap takes precedence over colorScale
       var colorScale;
 
       if (this.options.customColorMap && Array.isArray(this.options.customColorMap)) {
-        colorScale = this._parseCustomColorMap(this.options.customColorMap);
+        colorScale = this.options.customColorMap;
         console.log('Using custom color map:', {
-          originalMap: this.options.customColorMap.slice(0, 3),
-          parsedColors: colorScale.slice(0, 3),
+          colors: colorScale.slice(0, 3),
           totalColors: colorScale.length
         });
       } else {
@@ -658,6 +621,16 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
 
 
       var rgbColors = colorScale.map(function (color) {
+        // Handle hex colors
+        if (color.startsWith && color.startsWith('#')) {
+          var hex = color.slice(1);
+          var r = parseInt(hex.slice(0, 2), 16);
+          var g = parseInt(hex.slice(2, 4), 16);
+          var b = parseInt(hex.slice(4, 6), 16);
+          return [r, g, b];
+        } // Handle RGB strings
+
+
         var match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
         return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : [0, 0, 0];
       });
