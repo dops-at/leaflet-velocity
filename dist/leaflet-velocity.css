@@ -9,4 +9,22 @@
 .velocity-overlay {
   position: absolute;
   z-index: 1;
+  mix-blend-mode: normal;
+}
+
+.color-overlay {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  mix-blend-mode: normal;
+}
+
+/* Ensure proper pane ordering */
+
+.leaflet-pane[class*='-overlay'] {
+  z-index: 200 !important;
+}
+
+.leaflet-pane[class*='-particles'] {
+  z-index: 210 !important;
 }
