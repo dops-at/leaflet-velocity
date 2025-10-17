@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Leaflet Velocity - Viewport Filtering Fixed</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css" />
+    <link rel="stylesheet" href="dist/leaflet-velocity.min.css" />
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: #f8f9fa;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .header p {
+            margin: 5px 0 0 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .main-container {
+            display: flex;
+            height: calc(100vh - 80px);
+        }
+        
+        #map { 
+            flex: 1; 
+            min-height: 500px;
+        }
+        
+        .sidebar {
+            width: 350px;
+            background: white;
+            border-left: 1px solid #dee2e6;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .control-section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .control-section h3 {
+            margin: 0 0 15px 0;
+            font-size: 16px;
+            color: #495057;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 8px;
+        }
+        
+        .toggle-option {
+            display: flex;
+            align-items: center;
+            margin: 12px 0;
+            padding: 8px;
+            border-radius: 6px;
+            transition: background-color 0.2s;
+        }
+        
+        .toggle-option:hover {
+            background-color: rgba(0, 123, 255, 0.05);
+        }
+        
+        .toggle-option input[type="checkbox"] {
+            margin-right: 12px;
+            transform: scale(1.2);
+        }
+        
+        .toggle-option label {
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 8px;
+            transition: background-color 0.3s;
+        }
+        
+        .status-indicator.enabled { background: #28a745; }
+        .status-indicator.disabled { background: #dc3545; }
+        
+        .location-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .location-btn {
+            padding: 12px 8px;
+            border: 2px solid #007bff;
+            background: white;
+            color: #007bff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        
+        .location-btn:hover {
+            background: #007bff;
+            color: white;
+            transform: translateY(-1px);
+        }
+        
+        .location-btn.active {
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+        
+        .stats-display {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 6px 0;
+            padding: 4px 0;
+            border-bottom: 1px solid #f1f3f4;
+        }
+        
+        .stats-row:last-child {
+            border-bottom: none;
+        }
+        
+        .stats-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .stats-value {
+            color: #007bff;
+            font-weight: 500;
+        }
+        
+        .stats-value.success { color: #28a745; }
+        .stats-value.warning { color: #ffc107; }
+        .stats-value.danger { color: #dc3545; }
+        
+        .info-panel {
+            background: #e7f3ff;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 6px 6px 0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .action-btn {
+            padding: 10px 15px;
+            border: 2px solid #6c757d;
+            background: white;
+            color: #6c757d;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .action-btn:hover {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .console-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'SF Mono', monospace;
+            font-size: 11px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .console-line {
+            margin: 2px 0;
+            word-wrap: break-word;
+        }
+        
+        .console-line.info { color: #58a6ff; }
+        .console-line.success { color: #56d364; }
+        .console-line.warning { color: #f1e05a; }
+        .console-line.error { color: #f85149; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌬️ Leaflet Velocity - Viewport Filtering Demo</h1>
+        <p>Fixed implementation with production-ready distribution files</p>
+    </div>
+    
+    <div class="main-container">
+        <div id="map"></div>
+        
+        <div class="sidebar">
+            <!-- Viewport Controls -->
+            <div class="control-section">
+                <h3>🎯 Viewport Filtering</h3>
+                
+                <div class="toggle-option">
+                    <input type="checkbox" id="viewportFilter" onchange="toggleViewportFilter()">
+                    <label for="viewportFilter">Enable Viewport-Only Mode</label>
+                    <span class="status-indicator disabled" id="filterStatus"></span>
+                </div>
+                
+                <div class="toggle-option">
+                    <input type="checkbox" id="autoUpdate" checked onchange="toggleAutoUpdate()">
+                    <label for="autoUpdate">Auto-update on move</label>
+                </div>
+                
+                <div class="info-panel">
+                    <strong>💡 How it works:</strong><br>
+                    When enabled, only particles in the current map viewport are processed and rendered, dramatically improving performance when zoomed into specific regions.
+                </div>
+            </div>
+            
+            <!-- Test Locations -->
+            <div class="control-section">
+                <h3>🗺️ Test Locations</h3>
+                <div class="location-grid">
+                    <div class="location-btn" onclick="testLocation('usa')">🇺🇸 USA</div>
+                    <div class="location-btn" onclick="testLocation('europe')">🇪🇺 Europe</div>
+                    <div class="location-btn" onclick="testLocation('asia')">🇨🇳 Asia</div>
+                    <div class="location-btn" onclick="testLocation('pacific')">🌊 Pacific</div>
+                    <div class="location-btn" onclick="testLocation('global')">🌍 Global</div>
+                    <div class="location-btn" onclick="testZoomSequence()">🔍 Zoom Test</div>
+                </div>
+            </div>
+            
+            <!-- Performance Stats -->
+            <div class="control-section">
+                <h3>📊 Performance Statistics</h3>
+                <div class="stats-display" id="statsDisplay">
+                    <div class="stats-row">
+                        <span class="stats-label">Mode:</span>
+                        <span class="stats-value" id="modeStatus">Standard</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-label">Visible Particles:</span>
+                        <span class="stats-value" id="visibleCount">0</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-label">Filtered Particles:</span>
+                        <span class="stats-value" id="filteredCount">0</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-label">Filter Rate:</span>
+                        <span class="stats-value" id="filterRate">0%</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-label">Performance:</span>
+                        <span class="stats-value" id="performanceStatus">Standard</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-label">Last Update:</span>
+                        <span class="stats-value" id="lastUpdate">Never</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div class="control-section">
+                <h3>🛠️ Actions</h3>
+                <div class="action-buttons">
+                    <button class="action-btn" onclick="runPerformanceTest()">Run Performance Test</button>
+                    <button class="action-btn" onclick="showConsole()">Toggle Console</button>
+                    <button class="action-btn" onclick="resetStats()">Reset Statistics</button>
+                    <button class="action-btn" onclick="exportConfig()">Export Config</button>
+                </div>
+            </div>
+            
+            <!-- Console Output -->
+            <div class="control-section" id="consoleSection" style="display: none;">
+                <h3>💻 Console Output</h3>
+                <div class="console-output" id="consoleOutput"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"></script>
+    <script src="dist/leaflet-velocity.min.js"></script>
+
+    <script>
+        // Initialize map
+        var map = L.map('map').setView([20.0, 0.0], 3);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var velocityLayer = null;
+        var stats = {
+            visible: 0,
+            filtered: 0,
+            totalChecks: 0,
+            lastUpdate: new Date(),
+            viewportEnabled: false,
+            startTime: new Date()
+        };
+
+        var consoleVisible = false;
+        var consoleLogs = [];
+
+        // Test locations with optimal zoom levels for demonstration
+        var locations = {
+            usa: { coords: [39, -98], zoom: 4, name: 'United States' },
+            europe: { coords: [54, 15], zoom: 4, name: 'Europe' },
+            asia: { coords: [35, 105], zoom: 4, name: 'Asia' },
+            pacific: { coords: [0, -140], zoom: 3, name: 'Pacific Ocean' },
+            global: { coords: [20, 0], zoom: 2, name: 'Global View' }
+        };
+
+        function toggleViewportFilter() {
+            if (!velocityLayer) return;
+            
+            var checkbox = document.getElementById('viewportFilter');
+            var statusIndicator = document.getElementById('filterStatus');
+            
+            stats.viewportEnabled = checkbox.checked;
+            
+            if (checkbox.checked) {
+                statusIndicator.className = 'status-indicator enabled';
+                velocityLayer.setOptions({ viewportOnly: true });
+                addConsoleLog('🔧 Viewport filtering ENABLED', 'success');
+            } else {
+                statusIndicator.className = 'status-indicator disabled';
+                velocityLayer.setOptions({ viewportOnly: false });
+                addConsoleLog('🔧 Viewport filtering DISABLED', 'info');
+            }
+            
+            resetStats();
+            updateStatsDisplay();
+        }
+
+        function toggleAutoUpdate() {
+            if (!velocityLayer) return;
+            
+            var checkbox = document.getElementById('autoUpdate');
+            velocityLayer.setOptions({ autoUpdateOnMove: checkbox.checked });
+            addConsoleLog(`🔧 Auto-update on move: ${checkbox.checked ? 'ENABLED' : 'DISABLED'}`, 'info');
+        }
+
+        function testLocation(locationKey) {
+            var location = locations[locationKey];
+            if (!location) return;
+            
+            addConsoleLog(`📍 Testing location: ${location.name}`, 'info');
+            map.setView(location.coords, location.zoom);
+            
+            // Visual feedback
+            document.querySelectorAll('.location-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            event.target.classList.add('active');
+            setTimeout(() => event.target.classList.remove('active'), 3000);
+            
+            resetStats();
+        }
+
+        function testZoomSequence() {
+            addConsoleLog('🔍 Starting zoom sequence test...', 'warning');
+            
+            var zoomLevels = [
+                { coords: [40, -95], zoom: 2, name: 'Continental' },
+                { coords: [40, -95], zoom: 4, name: 'Regional' },
+                { coords: [40, -95], zoom: 6, name: 'State Level' },
+                { coords: [40, -95], zoom: 8, name: 'Local Area' }
+            ];
+            
+            var index = 0;
+            function nextZoom() {
+                if (index < zoomLevels.length) {
+                    var level = zoomLevels[index];
+                    addConsoleLog(`Zoom ${index + 1}/4: ${level.name} (${level.zoom})`, 'info');
+                    map.setView(level.coords, level.zoom);
+                    index++;
+                    setTimeout(nextZoom, 2500);
+                } else {
+                    addConsoleLog('✅ Zoom sequence completed', 'success');
+                }
+            }
+            nextZoom();
+        }
+
+        function runPerformanceTest() {
+            addConsoleLog('📊 Running performance test...', 'warning');
+            
+            var testSequence = [
+                { action: 'Enable filtering', fn: () => {
+                    document.getElementById('viewportFilter').checked = true;
+                    toggleViewportFilter();
+                }},
+                { action: 'Zoom to Europe', fn: () => map.setView([54, 15], 5) },
+                { action: 'Zoom to local area', fn: () => map.setView([54, 15], 8) },
+                { action: 'Disable filtering', fn: () => {
+                    document.getElementById('viewportFilter').checked = false;
+                    toggleViewportFilter();
+                }},
+                { action: 'Compare performance', fn: () => {
+                    var rate = parseFloat(document.getElementById('filterRate').textContent);
+                    addConsoleLog(`Performance test complete. Filter rate: ${rate}%`, 'success');
+                }}
+            ];
+            
+            var index = 0;
+            function nextTest() {
+                if (index < testSequence.length) {
+                    var test = testSequence[index];
+                    addConsoleLog(`${index + 1}. ${test.action}`, 'info');
+                    test.fn();
+                    index++;
+                    setTimeout(nextTest, 2000);
+                }
+            }
+            nextTest();
+        }
+
+        function showConsole() {
+            consoleVisible = !consoleVisible;
+            var consoleSection = document.getElementById('consoleSection');
+            consoleSection.style.display = consoleVisible ? 'block' : 'none';
+            
+            if (consoleVisible) {
+                updateConsoleDisplay();
+            }
+        }
+
+        function resetStats() {
+            stats.visible = 0;
+            stats.filtered = 0;
+            stats.totalChecks = 0;
+            stats.lastUpdate = new Date();
+            updateStatsDisplay();
+            addConsoleLog('📊 Statistics reset', 'info');
+        }
+
+        function exportConfig() {
+            var config = {
+                viewportOnly: stats.viewportEnabled,
+                autoUpdateOnMove: document.getElementById('autoUpdate').checked,
+                currentView: {
+                    center: map.getCenter(),
+                    zoom: map.getZoom()
+                },
+                performance: {
+                    filterRate: document.getElementById('filterRate').textContent,
+                    visibleParticles: stats.visible,
+                    filteredParticles: stats.filtered
+                },
+                timestamp: new Date().toISOString()
+            };
+            
+            console.log('📋 Current configuration:', JSON.stringify(config, null, 2));
+            addConsoleLog('📋 Configuration exported to browser console', 'success');
+        }
+
+        function updateStatsDisplay() {
+            var total = stats.visible + stats.filtered;
+            var filterRate = total > 0 ? ((stats.filtered / total) * 100).toFixed(1) : '0';
+            var performance = stats.viewportEnabled && parseFloat(filterRate) > 50 ? 'Highly Optimized' :
+                            stats.viewportEnabled && parseFloat(filterRate) > 20 ? 'Optimized' : 'Standard';
+            
+            document.getElementById('modeStatus').textContent = stats.viewportEnabled ? 'Viewport-Only' : 'Standard';
+            document.getElementById('modeStatus').className = `stats-value ${stats.viewportEnabled ? 'success' : 'warning'}`;
+            
+            document.getElementById('visibleCount').textContent = stats.visible.toLocaleString();
+            document.getElementById('filteredCount').textContent = stats.filtered.toLocaleString();
+            document.getElementById('filterRate').textContent = filterRate + '%';
+            
+            var rateElement = document.getElementById('filterRate');
+            rateElement.className = `stats-value ${parseFloat(filterRate) > 50 ? 'success' : parseFloat(filterRate) > 20 ? 'warning' : 'danger'}`;
+            
+            document.getElementById('performanceStatus').textContent = performance;
+            document.getElementById('performanceStatus').className = `stats-value ${performance.includes('Optimized') ? 'success' : 'warning'}`;
+            
+            document.getElementById('lastUpdate').textContent = stats.lastUpdate.toLocaleTimeString();
+        }
+
+        function addConsoleLog(message, type = 'info') {
+            var timestamp = new Date().toLocaleTimeString();
+            consoleLogs.push({ message, type, timestamp });
+            
+            // Keep only last 50 logs
+            if (consoleLogs.length > 50) {
+                consoleLogs.shift();
+            }
+            
+            if (consoleVisible) {
+                updateConsoleDisplay();
+            }
+        }
+
+        function updateConsoleDisplay() {
+            var consoleOutput = document.getElementById('consoleOutput');
+            consoleOutput.innerHTML = consoleLogs.map(log => 
+                `<div class="console-line ${log.type}">[${log.timestamp}] ${log.message}</div>`
+            ).join('');
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        // Enhanced console logging to track particles
+        var originalConsole = console.log;
+        console.log = function() {
+            var message = Array.prototype.slice.call(arguments).join(' ');
+            
+            // Track particle filtering from debug logs
+            if (message.includes('🧪 Particle')) {
+                stats.totalChecks++;
+                
+                if (message.includes('VISIBLE')) {
+                    stats.visible++;
+                } else if (message.includes('FILTERED')) {
+                    stats.filtered++;
+                }
+                
+                stats.lastUpdate = new Date();
+                updateStatsDisplay();
+            }
+            
+            // Add important messages to our console
+            if (message.includes('🎯') || message.includes('🔧') || message.includes('✅') || message.includes('❌')) {
+                var type = message.includes('❌') ? 'error' : 
+                          message.includes('✅') ? 'success' : 
+                          message.includes('🔧') ? 'warning' : 'info';
+                addConsoleLog(message, type);
+            }
+            
+            return originalConsole.apply(console, arguments);
+        };
+
+        // Map event handlers
+        map.on('moveend zoomend', function() {
+            var center = map.getCenter();
+            var zoom = map.getZoom();
+            addConsoleLog(`🗺️ Map: ${center.lng.toFixed(3)}, ${center.lat.toFixed(3)} | Z${zoom}`, 'info');
+        });
+
+        // Load wind data and initialize
+        fetch('demo/wind-global.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                addConsoleLog('🌬️ Wind data loaded successfully', 'success');
+                
+                velocityLayer = L.velocityLayer({
+                    displayValues: true,
+                    data: data,
+                    maxVelocity: 15,
+                    viewportOnly: false, // Start disabled for comparison
+                    autoUpdateOnMove: true,
+                    particleMultiplier: 1/800,
+                    frameRate: 15,
+                    particleAge: 90
+                }).addTo(map);
+                
+                addConsoleLog('✅ Velocity layer initialized', 'success');
+                addConsoleLog('🎯 Ready for viewport filtering tests!', 'info');
+                
+                // Initialize display
+                updateStatsDisplay();
+            })
+            .catch(error => {
+                addConsoleLog(`❌ Failed to load wind data: ${error.message}`, 'error');
+                console.error('❌ Failed to load wind data:', error);
+            });
+
+        // Initialize
+        addConsoleLog('🚀 Leaflet Velocity Demo initialized', 'success');
+        addConsoleLog('📋 Built with production distribution files', 'info');
+    </script>
+</body>
+</html>

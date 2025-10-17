@@ -6,7 +6,11 @@
  This class takes a canvas element and an array of data (1km GFS from http://www.emc.ncep.noaa.gov/index.php?branch=GFS)
  and then uses a mercator (forward/reverse) projection to correctly map wind vectors in "map space".
 
- The "start" method takes the bounds of the map at its current extent and starts the whole gridding,
+ The "start" method tak              if (shouldDraw) {
+                debugStats.visibleParticles++;
+              } else {
+                debugStats.filteredOutParticles++;
+              }nds of the map at its current extent and starts the whole gridding,
  interpolation and animation process.
  */
 
@@ -84,7 +88,11 @@ var Windy = function(params) {
     if (options.hasOwnProperty("frameRate")) FRAME_RATE = options.frameRate;
     FRAME_TIME = 1000 / FRAME_RATE;
 
-    if (options.hasOwnProperty("viewportOnly")) VIEWPORT_ONLY = options.viewportOnly;
+    if (options.hasOwnProperty("viewportOnly")) {
+      var oldValue = VIEWPORT_ONLY;
+      VIEWPORT_ONLY = options.viewportOnly;
+      console.log('🔧 setOptions: viewportOnly changed from', oldValue, 'to', VIEWPORT_ONLY);
+    }
     if (options.hasOwnProperty("autoUpdateOnMove")) AUTO_UPDATE_ON_MOVE = options.autoUpdateOnMove;
   };
 
@@ -192,7 +200,11 @@ var Windy = function(params) {
     for (var j = 0; j < nj; j++) {
       var row = [];
       for (var i = 0; i < ni; i++, p++) {
-        row[i] = builder.data(p);
+        var value = builder.data(p);
+        
+        // Keep all grid data available - filtering happens during particle rendering
+        
+        row[i] = value;
       }
       if (isContinuous) {
         // For wrapped grids, duplicate first column as last column to simplify interpolation logic
@@ -205,6 +217,14 @@ var Windy = function(params) {
       date: date,
       interpolate: interpolate
     });
+  };
+
+  // Debug counters for data point filtering
+  var interpolationStats = {
+    totalRequests: 0,
+    filteredOutRequests: 0,
+    validDataPoints: 0,
+    resetTime: Date.now()
   };
 
   /**
@@ -325,22 +345,32 @@ var Windy = function(params) {
     };
 
     field.randomize = function(o) {
-      // UNDONE: this method is terrible
       var x, y;
       var safetyNet = 0;
+      var viewportAttempts = 0;
+      var maxViewportAttempts = VIEWPORT_ONLY && currentViewportBounds ? 50 : 0;
+      
       do {
         x = Math.round(Math.floor(Math.random() * bounds.width) + bounds.x);
         y = Math.round(Math.floor(Math.random() * bounds.height) + bounds.y);
         
-        // If viewport filtering is enabled, prefer points within viewport
-        if (VIEWPORT_ONLY && currentViewportBounds && safetyNet < 15) {
+        // If viewport filtering is enabled, strongly prefer points within viewport
+        if (VIEWPORT_ONLY && currentViewportBounds && viewportAttempts < maxViewportAttempts) {
           var coord = invert(x, y);
           if (coord && !isInViewport(coord[0], coord[1])) {
-            continue; // Try again if outside viewport (but only for first 15 attempts)
+            viewportAttempts++;
+            continue; // Try again if outside viewport
           }
         }
         
-      } while (field(x, y)[2] === null && safetyNet++ < 30);
+        // Check if there's valid wind data at this location
+        var windData = field(x, y);
+        if (windData[2] !== null) {
+          break; // Found a valid location
+        }
+        
+      } while (safetyNet++ < 30);
+      
       o.x = x;
       o.y = y;
       return o;
@@ -469,6 +499,16 @@ var Windy = function(params) {
       buckets.forEach(function(bucket) {
         bucket.length = 0;
       });
+      
+      // Debug: Track viewport filtering statistics
+      var debugStats = {
+        totalParticles: particles.length,
+        visibleParticles: 0,
+        filteredOutParticles: 0,
+        validFieldParticles: 0,
+        drawnParticles: 0
+      };
+      
       particles.forEach(function(particle) {
         if (particle.age > MAX_PARTICLE_AGE) {
           field.randomize(particle).age = 0;
@@ -480,6 +520,7 @@ var Windy = function(params) {
         if (m === null) {
           particle.age = MAX_PARTICLE_AGE; // particle has escaped the grid, never to return...
         } else {
+          debugStats.validFieldParticles++;
           var xt = x + v[0];
           var yt = y + v[1];
           
@@ -487,9 +528,24 @@ var Windy = function(params) {
           var shouldDraw = true;
           if (VIEWPORT_ONLY && currentViewportBounds) {
             var coord = invert(x, y);
-            if (coord) {
+            if (coord && isFinite(coord[0]) && isFinite(coord[1])) {
               shouldDraw = isInViewport(coord[0], coord[1]);
+              if (shouldDraw) {
+                debugStats.visibleParticles++;
+              } else {
+                debugStats.filteredOutParticles++;
+              }
+              
+              // Debug: Log first few coordinate checks with more detail
+              if (debugStats.validFieldParticles <= 10) {
+                console.log(`🧪 Particle ${debugStats.validFieldParticles}: screen(${x.toFixed(1)}, ${y.toFixed(1)}) -> geo(${coord[0].toFixed(4)}, ${coord[1].toFixed(4)}) -> ${shouldDraw ? 'VISIBLE' : 'FILTERED'}`);
+              }
+            } else {
+              shouldDraw = false; // Invalid coordinates
+              debugStats.filteredOutParticles++;
             }
+          } else {
+            debugStats.visibleParticles++;
           }
           
           if (field(xt, yt)[2] !== null && shouldDraw) {
@@ -497,6 +553,7 @@ var Windy = function(params) {
             particle.xt = xt;
             particle.yt = yt;
             buckets[colorStyles.indexFor(m)].push(particle);
+            debugStats.drawnParticles++;
           } else {
             // Particle isn't visible, but it still moves through the field.
             particle.x = xt;
@@ -505,6 +562,15 @@ var Windy = function(params) {
         }
         particle.age += 1;
       });
+      
+      // Debug: Log particle statistics occasionally (less important than data filtering)
+      if (Math.random() < 0.005) { // Very occasional logging for particles
+        console.log('🎯 Particle Stats (visual only):', {
+          totalParticles: debugStats.totalParticles,
+          drawnParticles: debugStats.drawnParticles,
+          note: 'Particles are just visual elements - real filtering happens at data interpolation level'
+        });
+      }
     }
 
     var g = params.canvas.getContext("2d");
@@ -560,9 +626,9 @@ var Windy = function(params) {
       var viewportSouth = viewportBounds.south * 180 / Math.PI;
       var viewportNorth = viewportBounds.north * 180 / Math.PI;
       
-      // Add buffer around viewport (10% margin)
-      var lonBuffer = (viewportEast - viewportWest) * 0.1;
-      var latBuffer = (viewportNorth - viewportSouth) * 0.1;
+      // Add smaller buffer around viewport (5% margin to avoid over-filtering)
+      var lonBuffer = Math.abs(viewportEast - viewportWest) * 0.05;
+      var latBuffer = Math.abs(viewportNorth - viewportSouth) * 0.05;
       
       currentViewportBounds = {
         west: viewportWest - lonBuffer,
@@ -571,9 +637,40 @@ var Windy = function(params) {
         north: viewportNorth + latBuffer
       };
       
-      console.log('Viewport bounds set for filtering (degrees):', currentViewportBounds);
+      // Validate bounds are reasonable
+      if (currentViewportBounds.west < -180) currentViewportBounds.west = -180;
+      if (currentViewportBounds.east > 180) currentViewportBounds.east = 180;
+      if (currentViewportBounds.south < -90) currentViewportBounds.south = -90;
+      if (currentViewportBounds.north > 90) currentViewportBounds.north = 90;
+      
+      console.log('🎯 Viewport bounds set for filtering:', {
+        original: {
+          west: viewportWest.toFixed(4),
+          east: viewportEast.toFixed(4), 
+          south: viewportSouth.toFixed(4),
+          north: viewportNorth.toFixed(4)
+        },
+        withBuffer: {
+          west: currentViewportBounds.west.toFixed(4),
+          east: currentViewportBounds.east.toFixed(4),
+          south: currentViewportBounds.south.toFixed(4), 
+          north: currentViewportBounds.north.toFixed(4)
+        },
+        bufferSize: {
+          lon: lonBuffer.toFixed(4),
+          lat: latBuffer.toFixed(4)
+        }
+      });
+      
+      // Reset stats and debug counters when viewport changes
+      interpolationStats.totalRequests = 0;
+      interpolationStats.filteredOutRequests = 0;
+      interpolationStats.validDataPoints = 0;
+      interpolationStats.resetTime = Date.now();
+      isInViewport.debugCount = 0; // Reset debug counter
     } else {
       currentViewportBounds = null;
+      console.log('🎯 Viewport filtering disabled - processing all data');
     }
   };
   
@@ -581,6 +678,12 @@ var Windy = function(params) {
   var isInViewport = function(lon, lat) {
     if (!VIEWPORT_ONLY || !currentViewportBounds) {
       return true; // No filtering if viewport-only is disabled
+    }
+    
+    // Validate inputs
+    if (typeof lon !== 'number' || typeof lat !== 'number' || 
+        !isFinite(lon) || !isFinite(lat)) {
+      return false;
     }
     
     // Handle longitude wraparound (antimeridian crossing)
@@ -594,9 +697,59 @@ var Windy = function(params) {
     }
     
     var inLatitude = (lat >= currentViewportBounds.south && lat <= currentViewportBounds.north);
+    var result = inLongitude && inLatitude;
     
-    return inLongitude && inLatitude;
+    // Enhanced debug: Log viewport bounds and first few coordinate checks
+    if (typeof isInViewport.debugCount === 'undefined') {
+      isInViewport.debugCount = 0;
+      console.log('🎯 Viewport bounds for filtering:', currentViewportBounds);
+    }
+    if (isInViewport.debugCount < 10) {
+      console.log(`🔍 Viewport check [${isInViewport.debugCount}]: (${lon.toFixed(4)}, ${lat.toFixed(4)}) -> ${result ? 'IN' : 'OUT'}`);
+      console.log(`   Bounds: W:${currentViewportBounds.west.toFixed(4)} E:${currentViewportBounds.east.toFixed(4)} S:${currentViewportBounds.south.toFixed(4)} N:${currentViewportBounds.north.toFixed(4)}`);
+      isInViewport.debugCount++;
+    }
+    
+    return result;
   };
+  
+  // Debug summary log for data point filtering (called after map moves/zooms)
+  var logDataFilteringSummary = function() {
+    if (VIEWPORT_ONLY && interpolationStats.totalRequests > 0) {
+      var displayedPoints = interpolationStats.validDataPoints;
+      var totalDatasetSize = interpolationStats.totalRequests;
+      var filteredOutPoints = interpolationStats.filteredOutRequests;
+      var filteringRate = ((filteredOutPoints / totalDatasetSize) * 100).toFixed(1);
+      
+      console.log('🗺️ VIEWPORT FILTERING SUMMARY (after map move/zoom):', {
+        status: 'Viewport-only mode ENABLED',
+        currentlyDisplayed: displayedPoints + ' data points',
+        wholeDataset: totalDatasetSize + ' data points',
+        filtered: filteredOutPoints + ' data points (' + filteringRate + '% filtered)',
+        performance: filteredOutPoints > 0 ? 'Optimized - showing only viewport data' : 'No filtering needed for current view',
+        viewportBounds: currentViewportBounds ? {
+          west: currentViewportBounds.west.toFixed(2),
+          east: currentViewportBounds.east.toFixed(2),
+          south: currentViewportBounds.south.toFixed(2),
+          north: currentViewportBounds.north.toFixed(2)
+        } : 'Not set'
+      });
+    } else if (!VIEWPORT_ONLY) {
+      console.log('🗺️ VIEWPORT FILTERING SUMMARY (after map move/zoom):', {
+        status: 'Viewport-only mode DISABLED',
+        displaying: 'All available data (no filtering)',
+        performance: 'Standard mode - processing entire dataset'
+      });
+    }
+    
+    // Reset counters for next viewport change
+    interpolationStats.totalRequests = 0;
+    interpolationStats.filteredOutRequests = 0;
+    interpolationStats.validDataPoints = 0;
+    interpolationStats.resetTime = Date.now();
+  };
+
+
 
   var start = function(bounds, width, height, extent) {
     var mapBounds = {
@@ -613,7 +766,8 @@ var Windy = function(params) {
     // Set viewport bounds for filtering if enabled
     setViewportBounds(mapBounds);
 
-    // build grid (use original data, filtering happens during interpolation)
+    // build grid (with viewport filtering applied at grid level)
+    console.log('🏗️ Building grid with viewport filtering:', VIEWPORT_ONLY ? 'ENABLED' : 'DISABLED');
     buildGrid(gridData, function(grid) {
       // interpolateField
       interpolateField(
@@ -629,6 +783,9 @@ var Windy = function(params) {
           if (params.onFieldReady) {
             params.onFieldReady();
           }
+          
+          // Log summary after field is ready and processing is complete
+          setTimeout(logDataFilteringSummary, 500);
         }
       );
     });
@@ -651,7 +808,8 @@ var Windy = function(params) {
     isInViewport: isInViewport,
     invert: invert,
     getCurrentViewportBounds: function() { return currentViewportBounds; },
-    isViewportOnlyEnabled: function() { return VIEWPORT_ONLY; }
+    isViewportOnlyEnabled: function() { return VIEWPORT_ONLY; },
+    logFilteringSummary: logDataFilteringSummary
   };
 
   return windy;

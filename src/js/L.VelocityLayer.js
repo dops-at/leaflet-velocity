@@ -325,6 +325,13 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
     this._viewportTimer = setTimeout(function() {
       if (self.options.viewportOnly && self._windy) {
         self._clearAndRestart();
+        
+        // Log summary after restart is complete
+        setTimeout(function() {
+          if (self._windy && self._windy.logFilteringSummary) {
+            self._windy.logFilteringSummary();
+          }
+        }, 600); // Wait for processing to complete
       }
     }, 300); // 300ms debounce
   },
@@ -454,13 +461,24 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
       }
       
       var velocityGrid = [];
-      var debugInfo = { sampleCount: 0, velocitySum: 0, maxFound: 0, minFound: Infinity, normalizedSamples: [] };
+      var debugInfo = { 
+        sampleCount: 0, 
+        velocitySum: 0, 
+        maxFound: 0, 
+        minFound: Infinity, 
+        normalizedSamples: [],
+        totalSamplePoints: 0,
+        filteredOutPoints: 0,
+        validVelocityPoints: 0
+      };
       
       // First pass: Create a coarse grid of velocity samples
       for (var gy = 0; gy < height; gy += sampleGrid) {
         velocityGrid[gy] = velocityGrid[gy] || [];
         for (var gx = 0; gx < width; gx += sampleGrid) {
           try {
+            debugInfo.totalSamplePoints++;
+            
             // Check viewport filtering for color overlay
             var shouldSample = true;
             if (this.options.viewportOnly && this._windy.isViewportOnlyEnabled && this._windy.isViewportOnlyEnabled()) {
@@ -473,6 +491,7 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
             if (shouldSample) {
               var velocity = field(gx, gy);
               if (velocity && velocity.length >= 3 && velocity[2] !== null && !isNaN(velocity[2])) {
+                debugInfo.validVelocityPoints++;
                 var magnitude = velocity[2];
                 var normalizedMagnitude = Math.max(0, Math.min(1, (magnitude - minVelocity) / (maxVelocity - minVelocity)));
                 velocityGrid[gy][gx] = normalizedMagnitude;
@@ -497,6 +516,7 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
             } else {
               // Outside viewport - set to 0 (transparent)
               velocityGrid[gy][gx] = 0;
+              debugInfo.filteredOutPoints++;
             }
           } catch (e) {
             velocityGrid[gy][gx] = 0;
@@ -504,15 +524,24 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
         }
       }
       
-      console.log('Velocity Debug Info:', {
-        sampleCount: debugInfo.sampleCount,
-        avgVelocity: debugInfo.sampleCount > 0 ? debugInfo.velocitySum / debugInfo.sampleCount : 0,
-        minVelocity: minVelocity,
-        maxVelocity: maxVelocity,
-        actualMin: debugInfo.minFound,
-        actualMax: debugInfo.maxFound,
+      console.log('🎨 Color Overlay Debug Info:', {
+        mode: 'Color Overlay',
+        totalSamplePoints: debugInfo.totalSamplePoints,
+        validVelocityPoints: debugInfo.validVelocityPoints,
+        filteredOutPoints: debugInfo.filteredOutPoints,
+        drawnPoints: debugInfo.sampleCount,
+        viewportOnlyEnabled: this.options.viewportOnly,
+        filteringRate: debugInfo.totalSamplePoints > 0 ? 
+          ((debugInfo.filteredOutPoints / debugInfo.totalSamplePoints) * 100).toFixed(1) + '%' : '0%',
+        avgVelocity: debugInfo.sampleCount > 0 ? (debugInfo.velocitySum / debugInfo.sampleCount).toFixed(2) : 0,
+        velocityRange: {
+          min: minVelocity,
+          max: maxVelocity,
+          actualMin: debugInfo.minFound !== Infinity ? debugInfo.minFound.toFixed(2) : 'N/A',
+          actualMax: debugInfo.maxFound.toFixed(2)
+        },
         colorCount: rgbColors.length,
-        normalizedSamples: debugInfo.normalizedSamples
+        sampleGrid: sampleGrid
       });
       
       // Second pass: Use bilinear interpolation to create smooth gradients
