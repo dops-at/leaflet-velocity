@@ -9,10 +9,13 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
     maxVelocity: 10, // used to align color scale
     colorScale: null,
     customColorMap: null, // array of color strings for custom color mapping (same format as colorScale)
+    particleColor: 'default', // particle color mode: 'velocity', 'default', or specific color string
     data: null,
     showColorOverlay: false, // option to show color overlay
     overlayOpacity: 0.5, // opacity of the color overlay
-    overlaySmoothing: 'high' // smoothing quality: 'low', 'medium', 'high', 'ultra'
+    overlaySmoothing: 'high', // smoothing quality: 'low', 'medium', 'high', 'ultra'
+    viewportOnly: false, // if true, only display data in current map viewport (improves performance)
+    autoUpdateOnMove: true // if true and viewportOnly is enabled, automatically update on map pan/zoom
   },
 
   _map: null,
@@ -131,6 +134,18 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
     });
   },
 
+  toggleViewportOnly: function() {
+    this.setOptions({
+      viewportOnly: !this.options.viewportOnly
+    });
+  },
+
+  setViewportOnly: function(enabled) {
+    this.setOptions({
+      viewportOnly: enabled
+    });
+  },
+
   setOptions: function(options) {
     this.options = Object.assign(this.options, options);
     if (options.hasOwnProperty("displayOptions")) {
@@ -145,6 +160,23 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
       this._windy.setOptions(options);
       if (options.hasOwnProperty("data")) this._windy.setData(options.data);
       this._clearAndRestart();
+    }
+    
+    // Handle viewport-only mode changes
+    if (options.hasOwnProperty("viewportOnly")) {
+      if (this.options.viewportOnly && this.options.autoUpdateOnMove) {
+        // Enable viewport-only event handlers
+        if (this._map) {
+          this._map.on("moveend", this._onViewportChange, this);
+          this._map.on("zoomend", this._onViewportChange, this);
+        }
+      } else {
+        // Disable viewport-only event handlers
+        if (this._map) {
+          this._map.off("moveend", this._onViewportChange, this);
+          this._map.off("zoomend", this._onViewportChange, this);
+        }
+      }
     }
     
     // Handle overlay opacity changes
@@ -264,6 +296,12 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
     this._map.on("zoomstart", self._windy.stop);
     this._map.on("zoomend", self._clearAndRestart);
     this._map.on("resize", self._clearWind);
+    
+    // Add viewport-only event handlers if enabled
+    if (this.options.viewportOnly && this.options.autoUpdateOnMove) {
+      this._map.on("moveend", self._onViewportChange, this);
+      this._map.on("zoomend", self._onViewportChange, this);
+    }
 
     this._initMouseHandler(false);
   },
@@ -278,6 +316,17 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
       options["leafletVelocity"] = this;
       this._mouseControl = L.control.velocity(options).addTo(this._map);
     }
+  },
+
+  _onViewportChange: function() {
+    // Debounce viewport changes to avoid excessive updates
+    if (this._viewportTimer) clearTimeout(this._viewportTimer);
+    var self = this;
+    this._viewportTimer = setTimeout(function() {
+      if (self.options.viewportOnly && self._windy) {
+        self._clearAndRestart();
+      }
+    }, 300); // 300ms debounce
   },
 
   _clearAndRestart: function() {

@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Viewport-Only Display - Performance Feature</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="dist/leaflet-velocity.css" />
+    
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.2em;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2); 
+        }
+        
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-info { background: #06b6d4; color: white; }
+        .btn-secondary { background: #6b7280; color: white; }
+        
+        #map {
+            height: 600px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+        }
+        
+        .status {
+            background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+            border: 2px solid #10b981;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        
+        .feature-card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .feature-card h3 {
+            margin-top: 0;
+            color: #1f2937;
+            font-size: 1.3em;
+        }
+        
+        .performance-indicator {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 5px 5px 5px 0;
+        }
+        
+        .perf-excellent { background: #dcfce7; color: #166534; }
+        .perf-good { background: #fef3c7; color: #92400e; }
+        .perf-standard { background: #e5e7eb; color: #374151; }
+        
+        .comparison-table {
+            width: 100%;
+            margin: 15px 0;
+            border-collapse: collapse;
+        }
+        
+        .comparison-table th, .comparison-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .comparison-table th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 Viewport-Only Display Feature</h1>
+        <p>Display velocity data only in the current map view for improved performance</p>
+    </div>
+
+    <div class="container">
+        <div class="controls">
+            <h3>🎮 Viewport-Only Controls</h3>
+            
+            <div class="button-group">
+                <button class="btn btn-success" onclick="enableViewportOnly()">
+                    🔍 Enable Viewport-Only
+                </button>
+                <button class="btn btn-secondary" onclick="disableViewportOnly()">
+                    🌍 Show All Data
+                </button>
+                <button class="btn btn-primary" onclick="toggleAutoUpdate()">
+                    🔄 Toggle Auto-Update
+                </button>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn btn-info" onclick="showPerformanceStats()">
+                    📊 Performance Stats
+                </button>
+                <button class="btn btn-warning" onclick="zoomToAustralia()">
+                    🇦🇺 Zoom to Australia
+                </button>
+                <button class="btn btn-warning" onclick="zoomToGlobal()">
+                    🌏 Zoom to Global
+                </button>
+                <button class="btn btn-danger" onclick="testViewportChange()">
+                    🧪 Test View Change
+                </button>
+            </div>
+            
+            <div class="status" id="status">
+                🚀 Ready! Enable viewport-only mode to see data filtering in action.
+            </div>
+        </div>
+
+        <div id="map"></div>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>🔍 Viewport-Only Mode</h3>
+                <p>When enabled, only processes and displays velocity data within the current map viewport plus a small buffer area.</p>
+                
+                <div class="performance-indicator perf-excellent">Performance Boost</div>
+                <div class="performance-indicator perf-good">Memory Efficient</div>
+                <div class="performance-indicator perf-excellent">Faster Rendering</div>
+                
+                <p><strong>Benefits:</strong></p>
+                <ul>
+                    <li>Dramatically improved performance on large datasets</li>
+                    <li>Reduced memory usage</li>
+                    <li>Faster initial loading and viewport changes</li>
+                    <li>Smoother animations in focused areas</li>
+                </ul>
+            </div>
+            
+            <div class="feature-card">
+                <h3>🔄 Auto-Update on Move</h3>
+                <p>Automatically updates the displayed data when you pan or zoom the map (with smart debouncing).</p>
+                
+                <div class="performance-indicator perf-good">Smart Debouncing</div>
+                <div class="performance-indicator perf-excellent">Real-time Updates</div>
+                
+                <p><strong>Features:</strong></p>
+                <ul>
+                    <li>300ms debounce prevents excessive updates</li>
+                    <li>Automatic data refresh on viewport change</li>
+                    <li>Can be disabled for manual control</li>
+                    <li>Works with both pan and zoom operations</li>
+                </ul>
+            </div>
+            
+            <div class="feature-card">
+                <h3>📊 Performance Comparison</h3>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Mode</th>
+                            <th>Data Processing</th>
+                            <th>Memory Usage</th>
+                            <th>Rendering Speed</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Viewport-Only</strong></td>
+                            <td><span class="performance-indicator perf-excellent">Minimal</span></td>
+                            <td><span class="performance-indicator perf-excellent">Low</span></td>
+                            <td><span class="performance-indicator perf-excellent">Fast</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Full Dataset</strong></td>
+                            <td><span class="performance-indicator perf-standard">Complete</span></td>
+                            <td><span class="performance-indicator perf-good">Higher</span></td>
+                            <td><span class="performance-indicator perf-good">Standard</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="feature-card">
+                <h3>⚙️ Implementation Details</h3>
+                <p>The viewport-only feature intelligently filters data points based on geographic bounds with optimizations:</p>
+                <ul>
+                    <li><strong>Buffer Zone:</strong> Includes 10% margin around viewport</li>
+                    <li><strong>Smart Filtering:</strong> Grid-based data point selection</li>
+                    <li><strong>Memory Management:</strong> Efficient data structure handling</li>
+                    <li><strong>Event Optimization:</strong> Debounced viewport change detection</li>
+                </ul>
+                
+                <p><strong>API Usage:</strong></p>
+                <code style="background: #f3f4f6; padding: 8px; border-radius: 4px; display: block; margin: 10px 0;">
+velocityLayer.setOptions({<br>
+&nbsp;&nbsp;viewportOnly: true,<br>
+&nbsp;&nbsp;autoUpdateOnMove: true<br>
+});
+                </code>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="dist/leaflet-velocity.js"></script>
+
+    <script>
+        let map, velocityLayer;
+        let performanceStats = {
+            viewportOnlyEnabled: false,
+            autoUpdateEnabled: true,
+            lastUpdateTime: 0,
+            dataPointsProcessed: 0
+        };
+        
+        function updateStatus(message) {
+            document.getElementById('status').innerHTML = message;
+            console.log(message);
+        }
+
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView([25.0, 135.0], 4);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Load velocity data
+            fetch('demo/wind-gbr.json')
+                .then(response => response.json())
+                .then(data => {
+                    updateStatus('✅ Wind data loaded successfully');
+                    
+                    // Create velocity layer with viewport-only capabilities
+                    velocityLayer = L.velocityLayer({
+                        data: data,
+                        
+                        // Viewport-only configuration
+                        viewportOnly: false,          // Start with full data
+                        autoUpdateOnMove: true,       // Enable auto-updates
+                        
+                        // Visual settings
+                        showColorOverlay: true,
+                        overlayOpacity: 0.4,
+                        particleColor: 'velocity',
+                        customColorMap: [
+                            "#9700ff", "#0032ff", "#00c7ff", "#11d411", 
+                            "#fffe00", "#ff9600", "#dc4a1d", "#fe0096"
+                        ],
+                        
+                        // Performance settings
+                        particleCount: 4000,
+                        particleLife: 40,
+                        frameRate: 15,
+                        
+                        // Display settings
+                        displayValues: true,
+                        displayOptions: {
+                            velocityType: 'Wind',
+                            position: 'bottomleft'
+                        },
+                        
+                        // Data range
+                        minVelocity: 0,
+                        maxVelocity: 25,
+                        velocityScale: 0.005
+                    });
+
+                    velocityLayer.addTo(map);
+                    updateStatus('🌍 Velocity layer created with FULL DATASET mode - Use controls to test viewport-only feature!');
+                    
+                    // Add performance monitoring
+                    setupPerformanceMonitoring();
+                })
+                .catch(error => {
+                    updateStatus('❌ Error loading velocity data: ' + error.message);
+                });
+        }
+
+        // Viewport-only control functions
+        function enableViewportOnly() {
+            if (velocityLayer) {
+                performanceStats.viewportOnlyEnabled = true;
+                const startTime = performance.now();
+                
+                velocityLayer.setOptions({ 
+                    viewportOnly: true,
+                    autoUpdateOnMove: true 
+                });
+                
+                const endTime = performance.now();
+                performanceStats.lastUpdateTime = endTime - startTime;
+                
+                updateStatus(`🔍 VIEWPORT-ONLY ENABLED: Now showing only data in current view (${Math.round(performanceStats.lastUpdateTime)}ms update time)`);
+            }
+        }
+
+        function disableViewportOnly() {
+            if (velocityLayer) {
+                performanceStats.viewportOnlyEnabled = false;
+                const startTime = performance.now();
+                
+                velocityLayer.setOptions({ viewportOnly: false });
+                
+                const endTime = performance.now();
+                performanceStats.lastUpdateTime = endTime - startTime;
+                
+                updateStatus(`🌍 FULL DATASET MODE: Showing all available data (${Math.round(performanceStats.lastUpdateTime)}ms update time)`);
+            }
+        }
+
+        function toggleAutoUpdate() {
+            if (velocityLayer) {
+                performanceStats.autoUpdateEnabled = !performanceStats.autoUpdateEnabled;
+                velocityLayer.setOptions({ autoUpdateOnMove: performanceStats.autoUpdateEnabled });
+                
+                const status = performanceStats.autoUpdateEnabled ? 'ENABLED' : 'DISABLED';
+                updateStatus(`🔄 AUTO-UPDATE ${status}: Viewport changes will ${performanceStats.autoUpdateEnabled ? 'automatically' : 'not'} refresh data`);
+            }
+        }
+
+        function showPerformanceStats() {
+            const bounds = map.getBounds();
+            const zoom = map.getZoom();
+            const center = map.getCenter();
+            
+            const stats = {
+                viewportOnly: performanceStats.viewportOnlyEnabled,
+                autoUpdate: performanceStats.autoUpdateEnabled,
+                lastUpdateTime: Math.round(performanceStats.lastUpdateTime),
+                currentZoom: zoom,
+                centerLat: center.lat.toFixed(3),
+                centerLng: center.lng.toFixed(3),
+                boundsSize: `${(bounds.getEast() - bounds.getWest()).toFixed(1)}° × ${(bounds.getNorth() - bounds.getSouth()).toFixed(1)}°`
+            };
+            
+            updateStatus(`📊 PERFORMANCE STATS: ${JSON.stringify(stats, null, 2).replace(/[{}"]/g, '').replace(/,/g, ' |').replace(/\n/g, ' | ')}`);
+        }
+
+        // Navigation helpers
+        function zoomToAustralia() {
+            map.setView([-25, 135], 5);
+            updateStatus('🇦🇺 Zoomed to Australia - Perfect for testing viewport-only with regional data');
+        }
+
+        function zoomToGlobal() {
+            map.setView([25, 135], 3);
+            updateStatus('🌏 Zoomed to global view - Good for comparing full dataset vs viewport-only performance');
+        }
+
+        function testViewportChange() {
+            if (!performanceStats.viewportOnlyEnabled) {
+                updateStatus('⚠️ Enable viewport-only mode first to see the effect of viewport changes');
+                return;
+            }
+            
+            updateStatus('🧪 Testing viewport change - Watch the data update...');
+            
+            // Animate to different locations to test viewport updates
+            const locations = [
+                { center: [-30, 140], zoom: 6, name: 'Sydney Area' },
+                { center: [-20, 145], zoom: 5, name: 'Queensland' },
+                { center: [-35, 150], zoom: 7, name: 'Tasmania' }
+            ];
+            
+            let currentLocationIndex = 0;
+            
+            const animateToNext = () => {
+                const location = locations[currentLocationIndex];
+                map.setView(location.center, location.zoom);
+                updateStatus(`🧪 Testing: Moved to ${location.name} - Data should update automatically`);
+                
+                currentLocationIndex = (currentLocationIndex + 1) % locations.length;
+                
+                if (currentLocationIndex === 0) {
+                    setTimeout(() => {
+                        updateStatus('✅ Viewport change test complete - All data updates should have been automatic');
+                    }, 2000);
+                } else {
+                    setTimeout(animateToNext, 3000);
+                }
+            };
+            
+            setTimeout(animateToNext, 1000);
+        }
+
+        // Performance monitoring setup
+        function setupPerformanceMonitoring() {
+            // Monitor map events for performance tracking
+            map.on('movestart', function() {
+                performanceStats.moveStartTime = performance.now();
+            });
+            
+            map.on('moveend', function() {
+                if (performanceStats.moveStartTime) {
+                    const moveTime = performance.now() - performanceStats.moveStartTime;
+                    console.log(`Map move completed in ${Math.round(moveTime)}ms`);
+                }
+            });
+            
+            // Update stats display periodically
+            setInterval(function() {
+                if (document.getElementById('performance-indicator')) {
+                    document.getElementById('performance-indicator').innerHTML = 
+                        `Mode: ${performanceStats.viewportOnlyEnabled ? 'Viewport-Only' : 'Full Dataset'} | ` +
+                        `Auto-Update: ${performanceStats.autoUpdateEnabled ? 'ON' : 'OFF'}`;
+                }
+            }, 1000);
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initMap);
+        
+        // Add performance indicator to status bar
+        window.addEventListener('load', function() {
+            const indicator = document.createElement('div');
+            indicator.id = 'performance-indicator';
+            indicator.style.cssText = 'position:fixed;top:10px;right:10px;background:rgba(0,0,0,0.8);color:white;padding:8px 12px;border-radius:6px;font-size:12px;font-family:monospace;z-index:9999;';
+            document.body.appendChild(indicator);
+        });
+    </script>
+</body>
+</html>

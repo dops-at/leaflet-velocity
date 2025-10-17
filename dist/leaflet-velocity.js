@@ -296,12 +296,18 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
     colorScale: null,
     customColorMap: null,
     // array of color strings for custom color mapping (same format as colorScale)
+    particleColor: 'default',
+    // particle color mode: 'velocity', 'default', or specific color string
     data: null,
     showColorOverlay: false,
     // option to show color overlay
     overlayOpacity: 0.5,
     // opacity of the color overlay
-    overlaySmoothing: 'high' // smoothing quality: 'low', 'medium', 'high', 'ultra'
+    overlaySmoothing: 'high',
+    // smoothing quality: 'low', 'medium', 'high', 'ultra'
+    viewportOnly: false,
+    // if true, only display data in current map viewport (improves performance)
+    autoUpdateOnMove: true // if true and viewportOnly is enabled, automatically update on map pan/zoom
 
   },
   _map: null,
@@ -427,6 +433,16 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
       showColorOverlay: !this.options.showColorOverlay
     });
   },
+  toggleViewportOnly: function toggleViewportOnly() {
+    this.setOptions({
+      viewportOnly: !this.options.viewportOnly
+    });
+  },
+  setViewportOnly: function setViewportOnly(enabled) {
+    this.setOptions({
+      viewportOnly: enabled
+    });
+  },
   setOptions: function setOptions(options) {
     this.options = Object.assign(this.options, options);
 
@@ -444,6 +460,25 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
       if (options.hasOwnProperty("data")) this._windy.setData(options.data);
 
       this._clearAndRestart();
+    } // Handle viewport-only mode changes
+
+
+    if (options.hasOwnProperty("viewportOnly")) {
+      if (this.options.viewportOnly && this.options.autoUpdateOnMove) {
+        // Enable viewport-only event handlers
+        if (this._map) {
+          this._map.on("moveend", this._onViewportChange, this);
+
+          this._map.on("zoomend", this._onViewportChange, this);
+        }
+      } else {
+        // Disable viewport-only event handlers
+        if (this._map) {
+          this._map.off("moveend", this._onViewportChange, this);
+
+          this._map.off("zoomend", this._onViewportChange, this);
+        }
+      }
     } // Handle overlay opacity changes
 
 
@@ -556,7 +591,14 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
 
     this._map.on("zoomend", self._clearAndRestart);
 
-    this._map.on("resize", self._clearWind);
+    this._map.on("resize", self._clearWind); // Add viewport-only event handlers if enabled
+
+
+    if (this.options.viewportOnly && this.options.autoUpdateOnMove) {
+      this._map.on("moveend", self._onViewportChange, this);
+
+      this._map.on("zoomend", self._onViewportChange, this);
+    }
 
     this._initMouseHandler(false);
   },
@@ -572,6 +614,16 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
       options["leafletVelocity"] = this;
       this._mouseControl = L.control.velocity(options).addTo(this._map);
     }
+  },
+  _onViewportChange: function _onViewportChange() {
+    // Debounce viewport changes to avoid excessive updates
+    if (this._viewportTimer) clearTimeout(this._viewportTimer);
+    var self = this;
+    this._viewportTimer = setTimeout(function () {
+      if (self.options.viewportOnly && self._windy) {
+        self._clearAndRestart();
+      }
+    }, 300); // 300ms debounce
   },
   _clearAndRestart: function _clearAndRestart() {
     if (this._context) this._context.clearRect(0, 0, 3000, 3000);
@@ -878,6 +930,10 @@ var Windy = function Windy(params) {
   var FRAME_TIME = 1000 / FRAME_RATE; // desired frames per second
 
   var OPACITY = 0.97;
+  var VIEWPORT_ONLY = params.viewportOnly || false; // if true, only process data in current viewport
+
+  var AUTO_UPDATE_ON_MOVE = params.autoUpdateOnMove !== false; // auto-update when viewport changes
+
   var defaulColorScale = ["rgb(0,0,0)", // Black particles only
   "rgb(0,0,0)", // All particles will be black
   "rgb(0,0,0)", "rgb(0,0,0)", "rgb(0,0,0)", "rgb(0,0,0)", "rgb(0,0,0)", "rgb(0,0,0)", "rgb(0,0,0)", "rgb(0,0,0)", "rgb(0,0,0)", "rgb(0,0,0)", "rgb(0,0,0)", "rgb(0,0,0)", "rgb(0,0,0)"];
@@ -904,6 +960,8 @@ var Windy = function Windy(params) {
     if (options.hasOwnProperty("opacity")) OPACITY = +options.opacity;
     if (options.hasOwnProperty("frameRate")) FRAME_RATE = options.frameRate;
     FRAME_TIME = 1000 / FRAME_RATE;
+    if (options.hasOwnProperty("viewportOnly")) VIEWPORT_ONLY = options.viewportOnly;
+    if (options.hasOwnProperty("autoUpdateOnMove")) AUTO_UPDATE_ON_MOVE = options.autoUpdateOnMove;
   }; // interpolation for vectors like wind (u,v,m)
 
 
@@ -1146,7 +1204,15 @@ var Windy = function Windy(params) {
 
       do {
         x = Math.round(Math.floor(Math.random() * bounds.width) + bounds.x);
-        y = Math.round(Math.floor(Math.random() * bounds.height) + bounds.y);
+        y = Math.round(Math.floor(Math.random() * bounds.height) + bounds.y); // If viewport filtering is enabled, prefer points within viewport
+
+        if (VIEWPORT_ONLY && currentViewportBounds && safetyNet < 15) {
+          var coord = invert(x, y);
+
+          if (coord && !isInViewport(coord[0], coord[1])) {
+            continue; // Try again if outside viewport (but only for first 15 attempts)
+          }
+        }
       } while (field(x, y)[2] === null && safetyNet++ < 30);
 
       o.x = x;
@@ -1289,9 +1355,19 @@ var Windy = function Windy(params) {
           particle.age = MAX_PARTICLE_AGE; // particle has escaped the grid, never to return...
         } else {
           var xt = x + v[0];
-          var yt = y + v[1];
+          var yt = y + v[1]; // Check if particle should be visible based on viewport filtering
 
-          if (field(xt, yt)[2] !== null) {
+          var shouldDraw = true;
+
+          if (VIEWPORT_ONLY && currentViewportBounds) {
+            var coord = invert(x, y);
+
+            if (coord) {
+              shouldDraw = isInViewport(coord[0], coord[1]);
+            }
+          }
+
+          if (field(xt, yt)[2] !== null && shouldDraw) {
             // Path from (x,y) to (xt,yt) is visible, so add this particle to the appropriate draw bucket.
             particle.xt = xt;
             particle.yt = yt;
@@ -1348,6 +1424,52 @@ var Windy = function Windy(params) {
         draw();
       }
     })();
+  }; // Store viewport bounds for filtering during interpolation
+
+
+  var currentViewportBounds = null;
+
+  var setViewportBounds = function setViewportBounds(viewportBounds) {
+    if (VIEWPORT_ONLY) {
+      // viewportBounds are already in radians, convert to degrees
+      var viewportWest = viewportBounds.west * 180 / Math.PI;
+      var viewportEast = viewportBounds.east * 180 / Math.PI;
+      var viewportSouth = viewportBounds.south * 180 / Math.PI;
+      var viewportNorth = viewportBounds.north * 180 / Math.PI; // Add buffer around viewport (10% margin)
+
+      var lonBuffer = (viewportEast - viewportWest) * 0.1;
+      var latBuffer = (viewportNorth - viewportSouth) * 0.1;
+      currentViewportBounds = {
+        west: viewportWest - lonBuffer,
+        east: viewportEast + lonBuffer,
+        south: viewportSouth - latBuffer,
+        north: viewportNorth + latBuffer
+      };
+      console.log('Viewport bounds set for filtering (degrees):', currentViewportBounds);
+    } else {
+      currentViewportBounds = null;
+    }
+  }; // Check if a coordinate is within the current viewport
+
+
+  var isInViewport = function isInViewport(lon, lat) {
+    if (!VIEWPORT_ONLY || !currentViewportBounds) {
+      return true; // No filtering if viewport-only is disabled
+    } // Handle longitude wraparound (antimeridian crossing)
+
+
+    var inLongitude = false;
+
+    if (currentViewportBounds.west <= currentViewportBounds.east) {
+      // Normal case - no wraparound
+      inLongitude = lon >= currentViewportBounds.west && lon <= currentViewportBounds.east;
+    } else {
+      // Wraparound case - viewport crosses antimeridian
+      inLongitude = lon >= currentViewportBounds.west || lon <= currentViewportBounds.east;
+    }
+
+    var inLatitude = lat >= currentViewportBounds.south && lat <= currentViewportBounds.north;
+    return inLongitude && inLatitude;
   };
 
   var start = function start(bounds, width, height, extent) {
@@ -1359,7 +1481,9 @@ var Windy = function Windy(params) {
       width: width,
       height: height
     };
-    stop(); // build grid
+    stop(); // Set viewport bounds for filtering if enabled
+
+    setViewportBounds(mapBounds); // build grid (use original data, filtering happens during interpolation)
 
     buildGrid(gridData, function (grid) {
       // interpolateField
@@ -1387,7 +1511,8 @@ var Windy = function Windy(params) {
     createField: createField,
     interpolatePoint: interpolate,
     setData: setData,
-    setOptions: setOptions
+    setOptions: setOptions,
+    setViewportBounds: setViewportBounds
   };
   return windy;
 };

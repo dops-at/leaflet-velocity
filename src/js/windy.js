@@ -23,6 +23,8 @@ var Windy = function(params) {
   var FRAME_RATE = params.frameRate || 15;
   var FRAME_TIME = 1000 / FRAME_RATE; // desired frames per second
   var OPACITY = 0.97;
+  var VIEWPORT_ONLY = params.viewportOnly || false; // if true, only process data in current viewport
+  var AUTO_UPDATE_ON_MOVE = params.autoUpdateOnMove !== false; // auto-update when viewport changes
 
   var defaulColorScale = [
     "rgb(0,0,0)",        // Black particles only
@@ -81,6 +83,9 @@ var Windy = function(params) {
 
     if (options.hasOwnProperty("frameRate")) FRAME_RATE = options.frameRate;
     FRAME_TIME = 1000 / FRAME_RATE;
+
+    if (options.hasOwnProperty("viewportOnly")) VIEWPORT_ONLY = options.viewportOnly;
+    if (options.hasOwnProperty("autoUpdateOnMove")) AUTO_UPDATE_ON_MOVE = options.autoUpdateOnMove;
   };
 
   // interpolation for vectors like wind (u,v,m)
@@ -326,6 +331,15 @@ var Windy = function(params) {
       do {
         x = Math.round(Math.floor(Math.random() * bounds.width) + bounds.x);
         y = Math.round(Math.floor(Math.random() * bounds.height) + bounds.y);
+        
+        // If viewport filtering is enabled, prefer points within viewport
+        if (VIEWPORT_ONLY && currentViewportBounds && safetyNet < 15) {
+          var coord = invert(x, y);
+          if (coord && !isInViewport(coord[0], coord[1])) {
+            continue; // Try again if outside viewport (but only for first 15 attempts)
+          }
+        }
+        
       } while (field(x, y)[2] === null && safetyNet++ < 30);
       o.x = x;
       o.y = y;
@@ -468,7 +482,17 @@ var Windy = function(params) {
         } else {
           var xt = x + v[0];
           var yt = y + v[1];
-          if (field(xt, yt)[2] !== null) {
+          
+          // Check if particle should be visible based on viewport filtering
+          var shouldDraw = true;
+          if (VIEWPORT_ONLY && currentViewportBounds) {
+            var coord = invert(x, y);
+            if (coord) {
+              shouldDraw = isInViewport(coord[0], coord[1]);
+            }
+          }
+          
+          if (field(xt, yt)[2] !== null && shouldDraw) {
             // Path from (x,y) to (xt,yt) is visible, so add this particle to the appropriate draw bucket.
             particle.xt = xt;
             particle.yt = yt;
@@ -525,6 +549,55 @@ var Windy = function(params) {
     })();
   };
 
+  // Store viewport bounds for filtering during interpolation
+  var currentViewportBounds = null;
+  
+  var setViewportBounds = function(viewportBounds) {
+    if (VIEWPORT_ONLY) {
+      // viewportBounds are already in radians, convert to degrees
+      var viewportWest = viewportBounds.west * 180 / Math.PI;
+      var viewportEast = viewportBounds.east * 180 / Math.PI;
+      var viewportSouth = viewportBounds.south * 180 / Math.PI;
+      var viewportNorth = viewportBounds.north * 180 / Math.PI;
+      
+      // Add buffer around viewport (10% margin)
+      var lonBuffer = (viewportEast - viewportWest) * 0.1;
+      var latBuffer = (viewportNorth - viewportSouth) * 0.1;
+      
+      currentViewportBounds = {
+        west: viewportWest - lonBuffer,
+        east: viewportEast + lonBuffer,
+        south: viewportSouth - latBuffer,
+        north: viewportNorth + latBuffer
+      };
+      
+      console.log('Viewport bounds set for filtering (degrees):', currentViewportBounds);
+    } else {
+      currentViewportBounds = null;
+    }
+  };
+  
+  // Check if a coordinate is within the current viewport
+  var isInViewport = function(lon, lat) {
+    if (!VIEWPORT_ONLY || !currentViewportBounds) {
+      return true; // No filtering if viewport-only is disabled
+    }
+    
+    // Handle longitude wraparound (antimeridian crossing)
+    var inLongitude = false;
+    if (currentViewportBounds.west <= currentViewportBounds.east) {
+      // Normal case - no wraparound
+      inLongitude = (lon >= currentViewportBounds.west && lon <= currentViewportBounds.east);
+    } else {
+      // Wraparound case - viewport crosses antimeridian
+      inLongitude = (lon >= currentViewportBounds.west || lon <= currentViewportBounds.east);
+    }
+    
+    var inLatitude = (lat >= currentViewportBounds.south && lat <= currentViewportBounds.north);
+    
+    return inLongitude && inLatitude;
+  };
+
   var start = function(bounds, width, height, extent) {
     var mapBounds = {
       south: deg2rad(extent[0][1]),
@@ -537,7 +610,10 @@ var Windy = function(params) {
 
     stop();
 
-    // build grid
+    // Set viewport bounds for filtering if enabled
+    setViewportBounds(mapBounds);
+
+    // build grid (use original data, filtering happens during interpolation)
     buildGrid(gridData, function(grid) {
       // interpolateField
       interpolateField(
@@ -570,7 +646,8 @@ var Windy = function(params) {
     createField: createField,
     interpolatePoint: interpolate,
     setData: setData,
-    setOptions: setOptions
+    setOptions: setOptions,
+    setViewportBounds: setViewportBounds
   };
 
   return windy;
