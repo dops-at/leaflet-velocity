@@ -69,6 +69,13 @@ var velocityLayer = L.velocityLayer({
   // CUSTOM COLOR MAPPING (NEW)
   customColorMap: null, // array of color strings for custom color mapping (same format as colorScale)
 
+  // PARTICLE COLOR OPTIONS (NEW)
+  particleColor: 'default',       // particle coloring mode: 'velocity', 'default', or specific color string (e.g. '#ff0000')
+  
+  // VIEWPORT-ONLY OPTIONS (NEW)
+  viewportOnly: false,            // if true, only display data in current map viewport (improves performance)
+  autoUpdateOnMove: true,         // if true and viewportOnly is enabled, automatically update on map pan/zoom
+  
   // optional pane to add the layer, will be created if doesn't exist
   // leaflet v1+ only (falls back to overlayPane for < v1)
   paneName: "overlayPane",
@@ -133,8 +140,13 @@ var velocityLayer = L.velocityLayer({
 - Simple array of color strings (hex or rgb format)
 - Colors are mapped evenly across your velocity range (minVelocity to maxVelocity)
 - Automatic color interpolation between defined points
-- Applies to both overlay gradient and particle colors
+- Applies to both overlay gradient and particle colors when `particleColor: 'velocity'` is used
 - Dynamic color scheme switching at runtime
+
+**Particle Color Modes:**
+- `'velocity'`: Colors particles based on velocity using your custom color mapping
+- `'default'`: Uses black particles (traditional mode)
+- Specific color (e.g., `'#ff0000'`): All particles display in the specified color
 
 **Color Format Support:**
 - Hex colors: `"#ff0000"`
@@ -145,6 +157,36 @@ You control the wind speed range using `minVelocity` and `maxVelocity` options (
 
 For detailed examples and advanced usage, see [CUSTOM_COLOR_MAPPING.md](CUSTOM_COLOR_MAPPING.md).
 
+## Viewport-Only Display Feature
+
+The `viewportOnly` option enables performance optimization by only processing and displaying velocity data within the current map viewport. This feature dramatically improves performance on large datasets and reduces memory usage.
+
+- **viewportOnly**: `boolean` - Enable/disable viewport-only mode (default: `false`)
+- **autoUpdateOnMove**: `boolean` - Automatically update when viewport changes (default: `true`)
+
+**Performance Benefits:**
+- Dramatically improved rendering performance on large datasets
+- Reduced memory usage and CPU load
+- Faster initial loading times
+- Smoother animations in focused areas
+
+**Usage Example:**
+```javascript
+var velocityLayer = L.velocityLayer({
+  data: data,
+  viewportOnly: true,        // Enable viewport-only mode
+  autoUpdateOnMove: true,    // Auto-update on pan/zoom
+  showColorOverlay: true,
+  particleColor: 'velocity'
+});
+
+// Toggle viewport-only mode at runtime
+velocityLayer.setViewportOnly(true);
+velocityLayer.toggleViewportOnly();
+```
+
+The system automatically adds a 10% buffer around the visible area to ensure smooth transitions when panning. Viewport changes are debounced (300ms) to prevent excessive updates during rapid map movements.
+
 ## Public methods
 
 | method       | params     | description                       |
@@ -154,6 +196,8 @@ For detailed examples and advanced usage, see [CUSTOM_COLOR_MAPPING.md](CUSTOM_C
 | `setOverlayOpacity` | `{Number}` | set color overlay opacity (0-1) |
 | `setOverlaySmoothing` | `{String}` | set smoothing quality ('low', 'medium', 'high', 'ultra') |
 | `toggleColorOverlay` | none | toggle color overlay visibility |
+| `setViewportOnly` | `{Boolean}` | enable/disable viewport-only mode |
+| `toggleViewportOnly` | none | toggle viewport-only mode |
 
 ## Build / watch
 

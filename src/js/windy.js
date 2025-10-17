@@ -647,7 +647,11 @@ var Windy = function(params) {
     interpolatePoint: interpolate,
     setData: setData,
     setOptions: setOptions,
-    setViewportBounds: setViewportBounds
+    setViewportBounds: setViewportBounds,
+    isInViewport: isInViewport,
+    invert: invert,
+    getCurrentViewportBounds: function() { return currentViewportBounds; },
+    isViewportOnlyEnabled: function() { return VIEWPORT_ONLY; }
   };
 
   return windy;

@@ -461,27 +461,41 @@ L.VelocityLayer = (L.Layer ? L.Layer : L.Class).extend({
         velocityGrid[gy] = velocityGrid[gy] || [];
         for (var gx = 0; gx < width; gx += sampleGrid) {
           try {
-            var velocity = field(gx, gy);
-            if (velocity && velocity.length >= 3 && velocity[2] !== null && !isNaN(velocity[2])) {
-              var magnitude = velocity[2];
-              var normalizedMagnitude = Math.max(0, Math.min(1, (magnitude - minVelocity) / (maxVelocity - minVelocity)));
-              velocityGrid[gy][gx] = normalizedMagnitude;
-              
-              // Debug info
-              debugInfo.sampleCount++;
-              debugInfo.velocitySum += magnitude;
-              debugInfo.maxFound = Math.max(debugInfo.maxFound, magnitude);
-              debugInfo.minFound = Math.min(debugInfo.minFound, magnitude);
-              
-              // Collect some normalized samples for analysis
-              if (debugInfo.normalizedSamples.length < 10) {
-                debugInfo.normalizedSamples.push({
-                  raw: magnitude,
-                  normalized: normalizedMagnitude,
-                  position: [gx, gy]
-                });
+            // Check viewport filtering for color overlay
+            var shouldSample = true;
+            if (this.options.viewportOnly && this._windy.isViewportOnlyEnabled && this._windy.isViewportOnlyEnabled()) {
+              var coord = this._windy.invert(gx, gy);
+              if (coord && this._windy.isInViewport) {
+                shouldSample = this._windy.isInViewport(coord[0], coord[1]);
+              }
+            }
+            
+            if (shouldSample) {
+              var velocity = field(gx, gy);
+              if (velocity && velocity.length >= 3 && velocity[2] !== null && !isNaN(velocity[2])) {
+                var magnitude = velocity[2];
+                var normalizedMagnitude = Math.max(0, Math.min(1, (magnitude - minVelocity) / (maxVelocity - minVelocity)));
+                velocityGrid[gy][gx] = normalizedMagnitude;
+                
+                // Debug info
+                debugInfo.sampleCount++;
+                debugInfo.velocitySum += magnitude;
+                debugInfo.maxFound = Math.max(debugInfo.maxFound, magnitude);
+                debugInfo.minFound = Math.min(debugInfo.minFound, magnitude);
+                
+                // Collect some normalized samples for analysis
+                if (debugInfo.normalizedSamples.length < 10) {
+                  debugInfo.normalizedSamples.push({
+                    raw: magnitude,
+                    normalized: normalizedMagnitude,
+                    position: [gx, gy]
+                  });
+                }
+              } else {
+                velocityGrid[gy][gx] = 0;
               }
             } else {
+              // Outside viewport - set to 0 (transparent)
               velocityGrid[gy][gx] = 0;
             }
           } catch (e) {
