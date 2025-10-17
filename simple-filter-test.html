@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Viewport Filter Test</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css" />
+    <link rel="stylesheet" href="src/css/leaflet-velocity.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            min-width: 250px;
+        }
+        #map { width: 100%; height: 100vh; }
+        button {
+            width: 100%;
+            margin: 5px 0;
+            padding: 10px;
+            border: 1px solid #007bff;
+            background: #007bff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #0056b3; }
+        button.active { background: #28a745; border-color: #28a745; }
+        .status { 
+            margin: 10px 0; 
+            padding: 8px; 
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .status.enabled { background: #d4edda; color: #155724; }
+        .status.disabled { background: #f8d7da; color: #721c24; }
+        .instruction {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="controls">
+        <h3>🎯 Viewport Filter Test</h3>
+        <div id="status" class="status disabled">Filter: DISABLED</div>
+        <button id="toggle" onclick="toggleFilter()">Enable Viewport Filter</button>
+        <button onclick="zoomToEurope()">Zoom to Europe</button>
+        <button onclick="zoomToUSA()">Zoom to USA</button>
+        <button onclick="zoomOut()">Zoom Out (Global)</button>
+        
+        <div class="instruction">
+            <strong>Instructions:</strong><br>
+            1. Enable viewport filtering<br>
+            2. Zoom to a specific region<br>
+            3. Check console for particle logs<br>
+            4. Particles should be filtered when outside view
+        </div>
+        
+        <div id="particle-info" style="font-size: 12px; margin-top: 10px;">
+            Watch browser console (F12) for particle filtering logs
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"></script>
+    <script src="dist/leaflet-velocity.min.js"></script>
+
+    <script>
+        var map = L.map('map').setView([40.0, -95.0], 4);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var velocityLayer = null;
+        var isFilterEnabled = false;
+        var particleCount = { visible: 0, filtered: 0 };
+
+        // Enhanced console logging
+        var originalConsole = console.log;
+        console.log = function() {
+            var message = Array.prototype.slice.call(arguments).join(' ');
+            
+            // Track particle filtering
+            if (message.includes('🧪 Particle')) {
+                if (message.includes('VISIBLE')) {
+                    particleCount.visible++;
+                } else if (message.includes('FILTERED')) {
+                    particleCount.filtered++;
+                }
+                
+                // Update display
+                var total = particleCount.visible + particleCount.filtered;
+                var rate = total > 0 ? ((particleCount.filtered / total) * 100).toFixed(1) : '0';
+                document.getElementById('particle-info').innerHTML = `
+                    Particles: ${particleCount.visible} visible, ${particleCount.filtered} filtered (${rate}% filtered)<br>
+                    <small>Check console (F12) for detailed logs</small>
+                `;
+            }
+            
+            return originalConsole.apply(console, arguments);
+        };
+
+        function toggleFilter() {
+            if (!velocityLayer) return;
+            
+            isFilterEnabled = !isFilterEnabled;
+            var button = document.getElementById('toggle');
+            var status = document.getElementById('status');
+            
+            if (isFilterEnabled) {
+                button.textContent = 'Disable Viewport Filter';
+                button.classList.add('active');
+                status.textContent = 'Filter: ENABLED';
+                status.className = 'status enabled';
+                velocityLayer.setOptions({ viewportOnly: true });
+                console.log('🔧 Viewport filtering ENABLED');
+            } else {
+                button.textContent = 'Enable Viewport Filter';
+                button.classList.remove('active');
+                status.textContent = 'Filter: DISABLED';
+                status.className = 'status disabled';
+                velocityLayer.setOptions({ viewportOnly: false });
+                console.log('🔧 Viewport filtering DISABLED');
+            }
+            
+            // Reset counters
+            particleCount = { visible: 0, filtered: 0 };
+        }
+
+        function zoomToEurope() {
+            console.log('🗺️ Zooming to Europe');
+            map.setView([54.0, 15.0], 4);
+            particleCount = { visible: 0, filtered: 0 };
+        }
+
+        function zoomToUSA() {
+            console.log('🗺️ Zooming to USA');
+            map.setView([39.0, -98.0], 4);
+            particleCount = { visible: 0, filtered: 0 };
+        }
+
+        function zoomOut() {
+            console.log('🗺️ Zooming to global view');
+            map.setView([30.0, 0.0], 2);
+            particleCount = { visible: 0, filtered: 0 };
+        }
+
+        // Load wind data
+        fetch('demo/wind-global.json')
+            .then(response => response.json())
+            .then(data => {
+                console.log('🌬️ Loading wind data...');
+                velocityLayer = L.velocityLayer({
+                    displayValues: true,
+                    data: data,
+                    maxVelocity: 15,
+                    viewportOnly: false,
+                    autoUpdateOnMove: true,
+                    particleMultiplier: 1/500, // Fewer particles for clearer testing
+                    frameRate: 10 // Slower animation for easier debugging
+                }).addTo(map);
+                
+                console.log('✅ Wind layer loaded successfully');
+            })
+            .catch(error => {
+                console.error('❌ Failed to load wind data:', error);
+            });
+
+        // Log map movements
+        map.on('moveend', () => {
+            var bounds = map.getBounds();
+            console.log(`🗺️ Map moved - Center: ${map.getCenter().lng.toFixed(4)}, ${map.getCenter().lat.toFixed(4)} | Zoom: ${map.getZoom()}`);
+            console.log(`🗺️ Bounds: SW(${bounds.getSouthWest().lng.toFixed(4)}, ${bounds.getSouthWest().lat.toFixed(4)}) NE(${bounds.getNorthEast().lng.toFixed(4)}, ${bounds.getNorthEast().lat.toFixed(4)})`);
+        });
+    </script>
+</body>
+</html>

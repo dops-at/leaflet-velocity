@@ -1330,8 +1330,11 @@ var Windy = function Windy(params) {
 
     function interpolateColumn(x) {
       var column = [];
+      var filteredCount = 0;
+      var totalCount = 0;
 
       for (var y = bounds.y; y <= bounds.yMax; y += 2) {
+        totalCount++;
         var coord = invert(x, y);
 
         if (coord) {
@@ -1339,6 +1342,16 @@ var Windy = function Windy(params) {
               φ = coord[1];
 
           if (isFinite(λ)) {
+            // Apply viewport filtering at the field level
+            if (VIEWPORT_ONLY && currentViewportBounds) {
+              if (!isInViewport(λ, φ)) {
+                // Set to null for out-of-viewport coordinates
+                column[y + 1] = column[y] = NULL_WIND_VECTOR;
+                filteredCount++;
+                continue;
+              }
+            }
+
             var wind = grid.interpolate(λ, φ);
 
             if (wind) {
@@ -1347,6 +1360,16 @@ var Windy = function Windy(params) {
             }
           }
         }
+      } // Debug logging for field-level filtering
+
+
+      if (VIEWPORT_ONLY && currentViewportBounds && filteredCount > 0 && typeof interpolateColumn.debugCount === 'undefined') {
+        interpolateColumn.debugCount = 0;
+      }
+
+      if (VIEWPORT_ONLY && currentViewportBounds && interpolateColumn.debugCount < 3) {
+        console.log("\uD83D\uDD2C Field column ".concat(x, ": ").concat(filteredCount, "/").concat(totalCount, " points filtered (").concat((filteredCount / totalCount * 100).toFixed(1), "%)"));
+        interpolateColumn.debugCount++;
       }
 
       columns[x + 1] = columns[x] = column;

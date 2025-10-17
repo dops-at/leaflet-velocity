@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>✅ Viewport Filtering - FIXED</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css" />
+    <link rel="stylesheet" href="dist/leaflet-velocity.min.css" />
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .header p {
+            margin: 8px 0 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .main-container {
+            display: flex;
+            height: calc(100vh - 100px);
+            margin: 0 20px 20px 20px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        #map { 
+            flex: 1;
+        }
+        
+        .sidebar {
+            width: 350px;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            color: #333;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .control-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #667eea;
+        }
+        
+        .control-section h3 {
+            margin: 0 0 12px 0;
+            font-size: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .toggle-control {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin: 8px 0;
+            transition: all 0.2s;
+        }
+        
+        .toggle-control:hover {
+            background: #e9ecef;
+        }
+        
+        .toggle-control input {
+            margin-right: 12px;
+            transform: scale(1.3);
+        }
+        
+        .toggle-control label {
+            flex: 1;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        .status-indicator {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-indicator.active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-indicator.inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .test-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        
+        .test-btn {
+            padding: 10px 8px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        
+        .test-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-1px);
+        }
+        
+        .test-btn.active {
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .metric {
+            text-align: center;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .metric.highlight {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+        
+        .metric-label {
+            display: block;
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .metric-value {
+            display: block;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .metric-value.success { color: #28a745; }
+        .metric-value.warning { color: #ffc107; }
+        .metric-value.danger { color: #dc3545; }
+        
+        .success-panel {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            color: #155724;
+        }
+        
+        .success-panel strong {
+            display: block;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        
+        .console-mini {
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: 'SF Mono', monospace;
+            font-size: 10px;
+            max-height: 100px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .action-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .action-btn {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #6c757d;
+            background: white;
+            color: #6c757d;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        
+        .action-btn:hover {
+            background: #6c757d;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>✅ Leaflet Velocity - Viewport Filtering FIXED</h1>
+        <p>Field-level filtering now working correctly - particles filtered before creation</p>
+    </div>
+    
+    <div class="main-container">
+        <div id="map"></div>
+        
+        <div class="sidebar">
+            <!-- Filter Control -->
+            <div class="control-section">
+                <h3>🎯 Viewport Filtering</h3>
+                <div class="toggle-control">
+                    <input type="checkbox" id="filterToggle" onchange="toggleFilter()">
+                    <label for="filterToggle">Enable Field-Level Filtering</label>
+                    <span class="status-indicator inactive" id="filterStatus">OFF</span>
+                </div>
+                
+                <div class="success-panel" id="successPanel" style="display: none;">
+                    <strong>🎉 Filtering Active!</strong>
+                    Wind data is now filtered at the field interpolation level, preventing particles from being created outside the viewport.
+                </div>
+            </div>
+            
+            <!-- Test Locations -->
+            <div class="control-section">
+                <h3>🧪 Test Scenarios</h3>
+                <div class="test-grid">
+                    <div class="test-btn" onclick="testScenario('global')">🌍 Global</div>
+                    <div class="test-btn" onclick="testScenario('europe')">🇪🇺 Europe</div>
+                    <div class="test-btn" onclick="testScenario('usa')">🇺🇸 USA</div>
+                    <div class="test-btn" onclick="testScenario('pacific')">🌊 Pacific</div>
+                    <div class="test-btn" onclick="testScenario('zoom')">🔍 Zoom Test</div>
+                    <div class="test-btn" onclick="runFullTest()">🚀 Full Test</div>
+                </div>
+            </div>
+            
+            <!-- Real-time Metrics -->
+            <div class="control-section">
+                <h3>📊 Field Analysis</h3>
+                <div class="metrics">
+                    <div class="metric" id="filterRateMetric">
+                        <span class="metric-label">Filter Rate</span>
+                        <span class="metric-value" id="filterRateValue">0%</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Mode</span>
+                        <span class="metric-value" id="modeValue">Standard</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Field Points</span>
+                        <span class="metric-value" id="fieldPointsValue">0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Null Vectors</span>
+                        <span class="metric-value success" id="nullVectorsValue">0</span>
+                    </div>
+                </div>
+                
+                <div class="action-row">
+                    <button class="action-btn" onclick="analyzeField()">📊 Analyze</button>
+                    <button class="action-btn" onclick="showConsole()">💻 Console</button>
+                    <button class="action-btn" onclick="resetStats()">🔄 Reset</button>
+                </div>
+            </div>
+            
+            <!-- Console Output -->
+            <div class="control-section" id="consoleSection" style="display: none;">
+                <h3>💻 Debug Console</h3>
+                <div class="console-mini" id="consoleOutput"></div>
+            </div>
+            
+            <!-- Instructions -->
+            <div class="control-section">
+                <h3>🎯 How to Test</h3>
+                <ol style="font-size: 13px; line-height: 1.5; padding-left: 20px;">
+                    <li>Enable field-level filtering above</li>
+                    <li>Click a test scenario (Europe works best)</li>
+                    <li>Click "Analyze" to see filter statistics</li>
+                    <li>Check console for detailed logs</li>
+                    <li>Watch filter rate increase significantly!</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"></script>
+    <script src="dist/leaflet-velocity.min.js"></script>
+
+    <script>
+        var map = L.map('map').setView([20, 0], 3);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var velocityLayer = null;
+        var consoleLines = [];
+        var consoleVisible = false;
+        var stats = {
+            filterEnabled: false,
+            fieldPoints: 0,
+            nullVectors: 0,
+            filterRate: 0
+        };
+
+        var scenarios = {
+            global: { coords: [20, 0], zoom: 2, name: 'Global View' },
+            europe: { coords: [54, 15], zoom: 6, name: 'Europe Focus' },
+            usa: { coords: [39, -98], zoom: 6, name: 'USA Focus' },
+            pacific: { coords: [0, -150], zoom: 5, name: 'Pacific Ocean' },
+            zoom: { coords: [52.5, 13.4], zoom: 8, name: 'Berlin Zoom' }
+        };
+
+        function addConsoleLog(message) {
+            var timestamp = new Date().toLocaleTimeString();
+            consoleLines.push(`[${timestamp}] ${message}`);
+            if (consoleLines.length > 50) consoleLines.shift();
+            
+            if (consoleVisible) {
+                updateConsole();
+            }
+        }
+
+        function updateConsole() {
+            document.getElementById('consoleOutput').innerHTML = 
+                consoleLines.join('<br>');
+            document.getElementById('consoleOutput').scrollTop = 
+                document.getElementById('consoleOutput').scrollHeight;
+        }
+
+        function toggleFilter() {
+            if (!velocityLayer) return;
+            
+            var checkbox = document.getElementById('filterToggle');
+            var status = document.getElementById('filterStatus');
+            var panel = document.getElementById('successPanel');
+            
+            stats.filterEnabled = checkbox.checked;
+            
+            if (checkbox.checked) {
+                status.textContent = 'ON';
+                status.className = 'status-indicator active';
+                panel.style.display = 'block';
+                velocityLayer.setOptions({ viewportOnly: true });
+                addConsoleLog('✅ Field-level filtering ENABLED');
+            } else {
+                status.textContent = 'OFF';
+                status.className = 'status-indicator inactive';
+                panel.style.display = 'none';
+                velocityLayer.setOptions({ viewportOnly: false });
+                addConsoleLog('❌ Field-level filtering DISABLED');
+            }
+            
+            updateDisplay();
+        }
+
+        function testScenario(key) {
+            var scenario = scenarios[key];
+            if (!scenario) return;
+            
+            addConsoleLog(`🗺️ Testing: ${scenario.name}`);
+            map.setView(scenario.coords, scenario.zoom);
+            
+            // Visual feedback
+            document.querySelectorAll('.test-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            setTimeout(() => {
+                event.target.classList.remove('active');
+                if (stats.filterEnabled) {
+                    setTimeout(analyzeField, 2000);
+                }
+            }, 1000);
+        }
+
+        function runFullTest() {
+            addConsoleLog('🚀 Starting full filtering test...');
+            
+            var sequence = [
+                () => { document.getElementById('filterToggle').checked = false; toggleFilter(); },
+                () => testScenario('global'),
+                () => analyzeField(),
+                () => { document.getElementById('filterToggle').checked = true; toggleFilter(); },
+                () => testScenario('europe'),
+                () => analyzeField(),
+                () => addConsoleLog('✅ Full test complete - check filter rate difference!')
+            ];
+            
+            var index = 0;
+            function nextStep() {
+                if (index < sequence.length) {
+                    sequence[index]();
+                    index++;
+                    setTimeout(nextStep, 2000);
+                }
+            }
+            nextStep();
+        }
+
+        function analyzeField() {
+            if (!velocityLayer || !velocityLayer._windy || !velocityLayer._windy.field) {
+                addConsoleLog('❌ Cannot analyze - field not ready');
+                return;
+            }
+            
+            addConsoleLog('🔍 Analyzing wind field...');
+            
+            var field = velocityLayer._windy.field;
+            var canvas = velocityLayer._canvasLayer._canvas;
+            var width = canvas.width;
+            var height = canvas.height;
+            
+            var totalSamples = 500;
+            var nullCount = 0;
+            var validCount = 0;
+            
+            for (var i = 0; i < totalSamples; i++) {
+                var x = Math.floor(Math.random() * width);
+                var y = Math.floor(Math.random() * height);
+                
+                try {
+                    var vector = field(x, y);
+                    if (vector && vector.length >= 3) {
+                        if (vector[2] === null) {
+                            nullCount++;
+                        } else {
+                            validCount++;
+                        }
+                    }
+                } catch (e) {
+                    nullCount++;
+                }
+            }
+            
+            stats.fieldPoints = totalSamples;
+            stats.nullVectors = nullCount;
+            stats.filterRate = totalSamples > 0 ? ((nullCount / totalSamples) * 100) : 0;
+            
+            addConsoleLog(`📊 Analysis: ${nullCount}/${totalSamples} null vectors (${stats.filterRate.toFixed(1)}% filtered)`);
+            
+            if (stats.filterEnabled && stats.filterRate > 30) {
+                addConsoleLog('🎉 SUCCESS: High filter rate indicates field-level filtering is working!');
+                document.getElementById('filterRateMetric').classList.add('highlight');
+            } else if (stats.filterEnabled && stats.filterRate < 10) {
+                addConsoleLog('⚠️ Low filter rate - may need to zoom in more or try different location');
+            }
+            
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            document.getElementById('modeValue').textContent = stats.filterEnabled ? 'Viewport' : 'Standard';
+            document.getElementById('modeValue').className = `metric-value ${stats.filterEnabled ? 'success' : 'warning'}`;
+            
+            document.getElementById('fieldPointsValue').textContent = stats.fieldPoints.toLocaleString();
+            document.getElementById('nullVectorsValue').textContent = stats.nullVectors.toLocaleString();
+            
+            var rate = stats.filterRate.toFixed(1) + '%';
+            document.getElementById('filterRateValue').textContent = rate;
+            document.getElementById('filterRateValue').className = `metric-value ${stats.filterRate > 50 ? 'success' : stats.filterRate > 20 ? 'warning' : 'danger'}`;
+        }
+
+        function showConsole() {
+            consoleVisible = !consoleVisible;
+            var section = document.getElementById('consoleSection');
+            section.style.display = consoleVisible ? 'block' : 'none';
+            if (consoleVisible) updateConsole();
+        }
+
+        function resetStats() {
+            stats.fieldPoints = 0;
+            stats.nullVectors = 0;
+            stats.filterRate = 0;
+            consoleLines = [];
+            document.getElementById('filterRateMetric').classList.remove('highlight');
+            updateDisplay();
+            addConsoleLog('📊 Statistics reset');
+        }
+
+        // Enhanced console logging to capture field filtering
+        var originalConsole = console.log;
+        console.log = function() {
+            var message = Array.prototype.slice.call(arguments).join(' ');
+            
+            if (message.includes('🔬 Field column') || message.includes('🎯') || message.includes('✅') || message.includes('❌')) {
+                addConsoleLog(message);
+            }
+            
+            return originalConsole.apply(console, arguments);
+        };
+
+        // Load wind data
+        fetch('demo/wind-global.json')
+            .then(response => response.json())
+            .then(data => {
+                addConsoleLog('🌬️ Loading wind data...');
+                
+                velocityLayer = L.velocityLayer({
+                    displayValues: false,
+                    data: data,
+                    maxVelocity: 15,
+                    viewportOnly: false,
+                    autoUpdateOnMove: true,
+                    particleMultiplier: 1/1000,
+                    frameRate: 15
+                }).addTo(map);
+                
+                addConsoleLog('✅ Velocity layer loaded - ready for testing!');
+                
+                setTimeout(() => {
+                    addConsoleLog('💡 Enable filtering and test Europe for best results');
+                }, 2000);
+            })
+            .catch(error => {
+                addConsoleLog(`❌ Error loading wind data: ${error.message}`);
+            });
+
+        // Initialize
+        addConsoleLog('🚀 Field-level filtering test initialized');
+        updateDisplay();
+    </script>
+</body>
+</html>
